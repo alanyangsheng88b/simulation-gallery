@@ -791,9 +791,15 @@ button {
     font-size: 0.8rem;
   }
 
+
+  .modal-overlay {
+    padding: 8px;
+    align-items: flex-end;
+  }
+
   .modal-content {
-    height: 92vh;
-    border-radius: var(--radius-md);
+    height: 95vh;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
   }
 }
 

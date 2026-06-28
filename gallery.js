@@ -196,8 +196,8 @@ function openModal(sim) {
   // Focus close button for accessibility
   setTimeout(() => modalClose.focus(), 100);
 
-  // Set iframe src
-  modalIframe.src = sim.path;
+  // Cache-bust for reliable reloads
+  modalIframe.src = sim.path + (sim.path.includes('?') ? '&' : '?') + '_t=' + Date.now();
 
   // Track load
   let loaded = false;
@@ -214,12 +214,12 @@ function openModal(sim) {
     showModalError();
   };
 
-  // 15s timeout
+  // 30s timeout (extended for slow connections in China)
   loadTimeout = setTimeout(() => {
     if (!loaded) {
       showModalError();
     }
-  }, 15000);
+  }, 30000);
 }
 
 // ============================================================
