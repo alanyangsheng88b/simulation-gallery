@@ -1,0 +1,848 @@
+/* ============================================================
+   Design Tokens — Dark EDA Theme
+   ============================================================ */
+:root {
+  --bg-primary: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1c2333;
+  --border: #30363d;
+  --border-hover: #484f58;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-tertiary: #6e7681;
+
+  /* Category accent colors */
+  --accent-green: #00ff66;
+  --accent-cyan: #00f2fe;
+  --accent-orange: #ff6600;
+  --accent-purple: #bc8cff;
+
+  /* Layout */
+  --card-min-width: 300px;
+  --grid-gap: 20px;
+  --content-max-width: 1400px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Animations */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono",
+    "Lucida Console", Monaco, monospace;
+}
+
+/* ============================================================
+   Reset & Base
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--accent-cyan);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+a:hover {
+  color: var(--accent-green);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ============================================================
+   Site Header
+   ============================================================ */
+.site-header {
+  padding: 48px 24px 32px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(0, 255, 102, 0.03) 0%, transparent 100%);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-inner {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.logo-icon {
+  font-size: 2.2rem;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(0, 255, 102, 0.3)); }
+  50% { filter: drop-shadow(0 0 12px rgba(0, 255, 102, 0.6)); }
+}
+
+.logo-title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.logo-subtitle {
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+}
+
+.header-desc {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-bottom: 16px;
+  line-height: 1.7;
+}
+
+.header-meta {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.meta-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  background: rgba(22, 27, 34, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  backdrop-filter: blur(8px);
+}
+
+/* ============================================================
+   Filter Bar
+   ============================================================ */
+.filter-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding: 16px 24px;
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+}
+
+.filter-inner {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+
+.filter-inner::-webkit-scrollbar {
+  display: none;
+}
+
+/* Filter Pills */
+.filter-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 24px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  background: transparent;
+  transition: all var(--transition-base);
+  flex-shrink: 0;
+}
+
+.filter-pill:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+  background: rgba(48, 54, 61, 0.3);
+}
+
+.filter-pill:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+/* Active state per category */
+.filter-pill.active {
+  color: var(--text-primary);
+  border-color: var(--accent-cyan);
+  background: rgba(0, 242, 254, 0.08);
+}
+
+.filter-pill[data-category="antenna"].active {
+  border-color: var(--accent-green);
+  background: rgba(0, 255, 102, 0.08);
+}
+.filter-pill[data-category="field-kinematics"].active {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 242, 254, 0.08);
+}
+.filter-pill[data-category="mechanics"].active {
+  border-color: var(--accent-orange);
+  background: rgba(255, 102, 0, 0.08);
+}
+.filter-pill[data-category="circuit"].active {
+  border-color: var(--accent-purple);
+  background: rgba(188, 140, 255, 0.08);
+}
+
+/* ============================================================
+   Gallery Container
+   ============================================================ */
+.gallery-container {
+  flex: 1;
+  max-width: var(--content-max-width);
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+/* ============================================================
+   Card Grid
+   ============================================================ */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width), 1fr));
+  gap: var(--grid-gap);
+}
+
+/* ============================================================
+   Simulation Card
+   ============================================================ */
+.sim-card {
+  background: rgba(22, 27, 34, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.sim-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.3),
+    0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Category glow on hover */
+.sim-card[data-category="antenna"]:hover {
+  border-color: rgba(0, 255, 102, 0.4);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.3),
+    0 0 24px rgba(0, 255, 102, 0.08);
+}
+.sim-card[data-category="field-kinematics"]:hover {
+  border-color: rgba(0, 242, 254, 0.4);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.3),
+    0 0 24px rgba(0, 242, 254, 0.08);
+}
+.sim-card[data-category="mechanics"]:hover {
+  border-color: rgba(255, 102, 0, 0.4);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.3),
+    0 0 24px rgba(255, 102, 0, 0.08);
+}
+.sim-card[data-category="circuit"]:hover {
+  border-color: rgba(188, 140, 255, 0.4);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.3),
+    0 0 24px rgba(188, 140, 255, 0.08);
+}
+
+/* Thumbnail area */
+.card-thumbnail {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  background: var(--bg-surface);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Category gradient fallback */
+.card-thumbnail[data-category="antenna"] {
+  background: linear-gradient(135deg, #0d3320 0%, #0d1117 50%, #1a2a1a 100%);
+}
+.card-thumbnail[data-category="field-kinematics"] {
+  background: linear-gradient(135deg, #0d2233 0%, #0d1117 50%, #1a1a2a 100%);
+}
+.card-thumbnail[data-category="mechanics"] {
+  background: linear-gradient(135deg, #331a0d 0%, #0d1117 50%, #2a1a1a 100%);
+}
+.card-thumbnail[data-category="circuit"] {
+  background: linear-gradient(135deg, #1a0d33 0%, #0d1117 50%, #2a1a2a 100%);
+}
+
+.card-thumbnail-icon {
+  font-size: 3rem;
+  opacity: 0.3;
+  transition: all var(--transition-base);
+}
+
+.sim-card:hover .card-thumbnail-icon {
+  opacity: 0.5;
+  transform: scale(1.1);
+}
+
+.card-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Category badge */
+.card-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  backdrop-filter: blur(8px);
+}
+
+[data-category="antenna"] .card-badge {
+  background: rgba(0, 255, 102, 0.15);
+  color: var(--accent-green);
+  border: 1px solid rgba(0, 255, 102, 0.25);
+}
+[data-category="field-kinematics"] .card-badge {
+  background: rgba(0, 242, 254, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+}
+[data-category="mechanics"] .card-badge {
+  background: rgba(255, 102, 0, 0.15);
+  color: var(--accent-orange);
+  border: 1px solid rgba(255, 102, 0, 0.25);
+}
+[data-category="circuit"] .card-badge {
+  background: rgba(188, 140, 255, 0.15);
+  color: var(--accent-purple);
+  border: 1px solid rgba(188, 140, 255, 0.25);
+}
+
+/* Card body */
+.card-body {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.card-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.card-tag {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(48, 54, 61, 0.5);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+/* Card action */
+.card-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  margin: 0 16px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: rgba(48, 54, 61, 0.3);
+  color: var(--text-secondary);
+  transition: all var(--transition-base);
+}
+
+.sim-card:hover .card-action {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+/* Category button accent */
+[data-category="antenna"] .card-action:hover {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+  background: rgba(0, 255, 102, 0.05);
+}
+[data-category="field-kinematics"] .card-action:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(0, 242, 254, 0.05);
+}
+[data-category="mechanics"] .card-action:hover {
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+  background: rgba(255, 102, 0, 0.05);
+}
+[data-category="circuit"] .card-action:hover {
+  border-color: var(--accent-purple);
+  color: var(--accent-purple);
+  background: rgba(188, 140, 255, 0.05);
+}
+
+/* ============================================================
+   Skeleton Cards (Loading)
+   ============================================================ */
+.skeleton-card {
+  background: rgba(22, 27, 34, 0.6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.skeleton-card::before {
+  content: "";
+  display: block;
+  aspect-ratio: 3 / 2;
+  background: linear-gradient(
+    90deg,
+    rgba(48, 54, 61, 0.3) 25%,
+    rgba(48, 54, 61, 0.6) 50%,
+    rgba(48, 54, 61, 0.3) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.skeleton-card::after {
+  content: "";
+  display: block;
+  height: 80px;
+  margin: 16px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    rgba(48, 54, 61, 0.3) 25%,
+    rgba(48, 54, 61, 0.5) 50%,
+    rgba(48, 54, 61, 0.3) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ============================================================
+   Empty & Error States
+   ============================================================ */
+.empty-state {
+  text-align: center;
+  padding: 80px 24px;
+  color: var(--text-secondary);
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.empty-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.empty-desc {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+  border-radius: 24px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  background: rgba(0, 242, 254, 0.05);
+  transition: all var(--transition-base);
+}
+
+.retry-btn:hover {
+  background: rgba(0, 242, 254, 0.12);
+  border-color: rgba(0, 242, 254, 0.5);
+}
+
+/* ============================================================
+   Modal Overlay
+   ============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-overlay.closing {
+  animation: fadeOut 0.2s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  height: 85vh;
+  max-height: 900px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: scaleIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+
+.modal-overlay.closing .modal-content {
+  animation: scaleOut 0.2s ease forwards;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes scaleOut {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0.95); opacity: 0; }
+}
+
+/* Modal header */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.modal-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.modal-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.modal-btn:hover {
+  background: rgba(48, 54, 61, 0.5);
+  color: var(--text-primary);
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 80, 80, 0.15);
+  color: #ff5555;
+}
+
+/* Modal loading */
+.modal-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-secondary);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent-cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 0.9rem;
+}
+
+/* Modal iframe wrapper */
+.modal-iframe-wrapper {
+  flex: 1;
+  position: relative;
+  background: var(--bg-primary);
+}
+
+.modal-iframe-wrapper iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: var(--bg-primary);
+}
+
+/* Modal error */
+.modal-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+.site-footer {
+  text-align: center;
+  padding: 24px;
+  border-top: 1px solid var(--border);
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+}
+
+.site-footer a {
+  color: var(--text-secondary);
+}
+
+.site-footer a:hover {
+  color: var(--accent-cyan);
+}
+
+/* ============================================================
+   Responsive Breakpoints
+   ============================================================ */
+
+/* < 640px: single column */
+@media (max-width: 639px) {
+  .site-header {
+    padding: 32px 16px 24px;
+  }
+
+  .logo {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .logo-title {
+    font-size: 1.5rem;
+  }
+
+  .gallery-container {
+    padding: 20px 12px 40px;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-bar {
+    padding: 12px 12px;
+  }
+
+  .filter-pill {
+    padding: 6px 14px;
+    font-size: 0.8rem;
+  }
+
+  .modal-content {
+    height: 92vh;
+    border-radius: var(--radius-md);
+  }
+}
+
+/* 640px - 900px: two columns */
+@media (min-width: 640px) and (max-width: 899px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 900px - 1200px: three columns */
+@media (min-width: 900px) and (max-width: 1199px) {
+  .card-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* > 1200px: four columns */
+@media (min-width: 1200px) {
+  .card-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ============================================================
+   Accessibility
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Print (hide interactive elements)
+   ============================================================ */
+@media print {
+  .filter-bar,
+  .modal-overlay,
+  .site-footer {
+    display: none !important;
+  }
+}

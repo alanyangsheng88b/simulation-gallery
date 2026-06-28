@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>篮球拍球动画：三种实现方式深度比较</title>
+    <!-- Tailwind CSS 用于现代化 UI 布局 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定义微粒纹理，通过 SVG Data-URI 嵌入以保证无额外网络请求依赖 */
+        .leather-texture {
+            background-color: #e65c00;
+            background-image: 
+                radial-gradient(circle at 50% 120%, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0.4) 100%),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Ccircle cx='1' cy='1' r='0.8' fill='%23bf4300' opacity='0.75'/%3E%3Ccircle cx='3' cy='3' r='0.8' fill='%23ff944d' opacity='0.4'/%3E%3C/svg%3E");
+            background-size: 100% 100%, 4px 4px;
+        }
+
+        /* 动画过渡与球体阴影 */
+        .floor-shadow {
+            background: radial-gradient(ellipse at center, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 70%);
+            transition: transform 0.05s linear, opacity 0.05s linear;
+        }
+
+        /* 自定义滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <!-- 顶部状态栏 -->
+    <header class="w-full max-w-6xl mb-6 text-center">
+        <h1 class="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-amber-500">
+            篮球拍球物理动画：Web 技术沙箱对比
+        </h1>
+        <p class="text-slate-400 mt-2 text-sm md:text-base">
+            基于真实物理引擎公式，对比 Canvas API、SVG 与 CSS 在渲染细腻凹槽微晶颗粒及物理形变时的性能表现。
+        </p>
+    </header>
+
+    <!-- 顶层交互控制台 -->
+    <section class="w-full max-w-6xl bg-slate-800/80 border border-slate-700/50 backdrop-blur rounded-2xl p-5 mb-8 grid grid-cols-1 md:grid-cols-4 gap-6 shadow-xl">
+        <div class="space-y-2">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">重力速度 (Gravity)</label>
+            <input type="range" id="gravity-slider" min="0.1" max="1.5" step="0.05" value="0.5" class="w-full accent-orange-500 bg-slate-700 h-2 rounded-lg appearance-none cursor-pointer">
+            <span id="gravity-val" class="text-sm font-mono text-orange-400">0.5 px/frame²</span>
+        </div>
+        <div class="space-y-2">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">弹性恢复系数 (Bounce)</label>
+            <input type="range" id="bounce-slider" min="0.5" max="1.0" step="0.02" value="0.85" class="w-full accent-orange-500 bg-slate-700 h-2 rounded-lg appearance-none cursor-pointer">
+            <span id="bounce-val" class="text-sm font-mono text-orange-400">0.85</span>
+        </div>
+        <div class="space-y-2">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">地面硬度 (形变程度)</label>
+            <input type="range" id="squish-slider" min="0.05" max="0.3" step="0.02" value="0.15" class="w-full accent-orange-500 bg-slate-700 h-2 rounded-lg appearance-none cursor-pointer">
+            <span id="squish-val" class="text-sm font-mono text-orange-400">15% 最大形变</span>
+        </div>
+        <div class="flex items-end justify-center gap-2">
+            <button id="btn-kick" class="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-orange-500/20 active:scale-95 transition-all text-sm">
+                拍一下球 (施加外力)
+            </button>
+        </div>
+    </section>
+
+    <!-- 三种实现方式并排容器 -->
+    <main class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        
+        <!-- 1. Canvas API 容器 -->
+        <div class="bg-slate-800/50 border border-slate-700/40 rounded-2xl p-4 flex flex-col items-center relative overflow-hidden group hover:border-orange-500/30 transition-all duration-300">
+            <div class="absolute top-3 left-3 bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-mono px-2 py-0.5 rounded-full">
+                Canvas 2D (即时模式)
+            </div>
+            <div class="absolute top-3 right-3 text-right">
+                <span id="canvas-fps" class="text-emerald-400 font-mono text-xs font-bold">-- FPS</span>
+            </div>
+            
+            <h2 class="text-lg font-bold text-slate-200 mt-6 mb-2">1. Canvas API </h2>
+            
+            <!-- 运动轨道模拟容器 -->
+            <div class="relative w-full h-[360px] bg-slate-950/60 rounded-xl flex flex-col justify-end items-center overflow-hidden border border-slate-900 shadow-inner">
+                <canvas id="canvas-stage" width="280" height="360" class="w-full h-full"></canvas>
+            </div>
+            <p class="text-xs text-slate-400 mt-3 text-center leading-relaxed">
+                <strong>优势：</strong>高性能图像缓冲渲染，颗粒度到像素级别，能够精细复刻真实球体微凸点与暗部阴影叠加。
+            </p>
+        </div>
+
+        <!-- 2. SVG 容器 -->
+        <div class="bg-slate-800/50 border border-slate-700/40 rounded-2xl p-4 flex flex-col items-center relative overflow-hidden group hover:border-orange-500/30 transition-all duration-300">
+            <div class="absolute top-3 left-3 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-mono px-2 py-0.5 rounded-full">
+                SVG (矢量保留模式)
+            </div>
+            <div class="absolute top-3 right-3 text-right">
+                <span id="svg-fps" class="text-emerald-400 font-mono text-xs font-bold">-- FPS</span>
+            </div>
+            
+            <h2 class="text-lg font-bold text-slate-200 mt-6 mb-2">2. SVG Scalable</h2>
+            
+            <!-- 运动轨道模拟容器 -->
+            <div class="relative w-full h-[360px] bg-slate-950/60 rounded-xl overflow-hidden border border-slate-900 shadow-inner">
+                <!-- 底部阴影 -->
+                <div id="svg-shadow" class="floor-shadow absolute bottom-[10px] left-1/2 -translate-x-1/2 w-20 h-4 rounded-full"></div>
+                
+                <!-- SVG球体元素 -->
+                <svg id="svg-element" class="absolute left-1/2" style="width: 100px; height: 100px; margin-left: -50px; transform-origin: bottom center; will-change: transform;" viewBox="0 0 100 100">
+                    <defs>
+                        <!-- 皮革微粒滤镜：使用 SVG 噪点与平铺图案实现高解析度纹理 -->
+                        <pattern id="svg-leather-dots" width="4" height="4" patternUnits="userSpaceOnUse">
+                            <rect width="4" height="4" fill="#ff751a"/>
+                            <circle cx="1" cy="1" r="0.7" fill="#802b00" opacity="0.6"/>
+                            <circle cx="3" cy="3" r="0.7" fill="#ff9955" opacity="0.4"/>
+                        </pattern>
+                        <!-- 真实感球面径向光照阴影 -->
+                        <radialGradient id="sphere-lighting" cx="35%" cy="30%" r="65%">
+                            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25"/>
+                            <stop offset="40%" stop-color="#000000" stop-opacity="0"/>
+                            <stop offset="100%" stop-color="#000000" stop-opacity="0.45"/>
+                        </radialGradient>
+                    </defs>
+                    
+                    <!-- 1. 基础皮革纹理层 -->
+                    <circle cx="50" cy="50" r="49" fill="url(#svg-leather-dots)"/>
+                    
+                    <!-- 2. 精细黑线与凹槽刻画 -->
+                    <g stroke="#1a0a00" stroke-width="2.5" fill="none" stroke-linecap="round">
+                        <!-- 外侧防漏圈线 -->
+                        <circle cx="50" cy="50" r="48.5" stroke="#000000" stroke-width="1.2"/>
+                        <!-- 十字主干线 -->
+                        <line x1="50" y1="1" x2="50" y2="99" stroke="#100500" stroke-width="3"/>
+                        <line x1="1" y1="50" x2="99" y2="50" stroke="#100500" stroke-width="3"/>
+                        <!-- 完美的篮球抛物缝合线（依据真球透视） -->
+                        <!-- 左弧线 -->
+                        <path d="M15,15 Q50,40 15,85" />
+                        <!-- 右弧线 -->
+                        <path d="M85,15 Q50,40 85,85" />
+                        <!-- 横向加强透视弧度线 -->
+                        <path d="M5,50 Q50,20 95,50" stroke="#100500" stroke-width="2" opacity="0.35"/>
+                        <path d="M5,50 Q50,80 95,50" stroke="#100500" stroke-width="2" opacity="0.35"/>
+                    </g>
+
+                    <!-- 3. 高光与边缘渐变混合层（实现3D球体凹凸感） -->
+                    <circle cx="50" cy="50" r="49" fill="url(#sphere-lighting)"/>
+                </svg>
+            </div>
+            <p class="text-xs text-slate-400 mt-3 text-center leading-relaxed">
+                <strong>优势：</strong>基于矢量标签，完美的缩放不失真。通过组合矢量 `path` 与 `pattern` 实现接近原生渲染器的矢量图细节。
+            </p>
+        </div>
+
+        <!-- 3. CSS Shapes / Clip-path 容器 -->
+        <div class="bg-slate-800/50 border border-slate-700/40 rounded-2xl p-4 flex flex-col items-center relative overflow-hidden group hover:border-orange-500/30 transition-all duration-300">
+            <div class="absolute top-3 left-3 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-[10px] font-mono px-2 py-0.5 rounded-full">
+                CSS Dom & Shapes
+            </div>
+            <div class="absolute top-3 right-3 text-right">
+                <span id="css-fps" class="text-emerald-400 font-mono text-xs font-bold">-- FPS</span>
+            </div>
+            
+            <h2 class="text-lg font-bold text-slate-200 mt-6 mb-2">3. CSS Shapes</h2>
+            
+            <!-- 运动轨道模拟容器 -->
+            <div class="relative w-full h-[360px] bg-slate-950/60 rounded-xl overflow-hidden border border-slate-900 shadow-inner">
+                <!-- 底部阴影 -->
+                <div id="css-shadow" class="floor-shadow absolute bottom-[10px] left-1/2 -translate-x-1/2 w-20 h-4 rounded-full"></div>
+                
+                <!-- CSS 球体 -->
+                <div id="css-ball-el" class="absolute left-1/2 leather-texture rounded-full shadow-inner shadow-black/40 overflow-hidden" 
+                     style="width: 100px; height: 100px; margin-left: -50px; transform-origin: bottom center; will-change: transform;">
+                     
+                    <!-- 使用 CSS Clip-path 遮罩与伪元素层叠，构建球体筋线 -->
+                    <div class="absolute inset-0">
+                        <!-- 竖直线 -->
+                        <div class="absolute left-1/2 top-0 -translate-x-1/2 w-[3px] h-full bg-slate-950"></div>
+                        <!-- 水平线 -->
+                        <div class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] w-full bg-slate-950"></div>
+                        
+                        <!-- 左弧线曲线 (利用 border-radius 模拟弧线) -->
+                        <div class="absolute -left-1/3 top-1/10 w-[100%] h-[80%] border-r-[3px] border-slate-950 rounded-full opacity-90"></div>
+                        <!-- 右弧线曲线 -->
+                        <div class="absolute -right-1/3 top-1/10 w-[100%] h-[80%] border-l-[3px] border-slate-950 rounded-full opacity-90"></div>
+                        
+                        <!-- 顶部高光和立体边缘 -->
+                        <div class="absolute inset-0 rounded-full bg-gradient-to-br from-white/20 via-transparent to-black/50 pointer-events-none"></div>
+                    </div>
+                </div>
+            </div>
+            <p class="text-xs text-slate-400 mt-3 text-center leading-relaxed">
+                <strong>优势：</strong>直接复用系统硬件渲染管道。采用 `will-change` 属性触发 GPU 的加速合成，极度适合简单的平移挤压动画。
+            </p>
+        </div>
+
+    </main>
+
+    <!-- 深度技术规格对比与基准分析 -->
+    <footer class="w-full max-w-6xl bg-slate-800/40 border border-slate-700/30 rounded-2xl p-6 shadow-md">
+        <h3 class="text-lg font-bold text-slate-200 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            渲染引擎架构与特征深度对比
+        </h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs md:text-sm text-slate-300 border-collapse">
+                <thead>
+                    <tr class="border-b border-slate-700/60 text-slate-400">
+                        <th class="pb-3 font-semibold">评估维度</th>
+                        <th class="pb-3 font-semibold">Canvas API (2D)</th>
+                        <th class="pb-3 font-semibold">SVG Vector</th>
+                        <th class="pb-3 font-semibold">CSS Shapes & Transitions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700/30">
+                    <tr>
+                        <td class="py-3 font-medium text-slate-100">底层机制</td>
+                        <td class="py-3">像素缓冲区即时渲染 (Immediate Mode)</td>
+                        <td class="py-3">XML 矢量节点树保留模式 (Retained Mode)</td>
+                        <td class="py-3">DOM 结构样式树物理挂载</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3 font-medium text-slate-100">细腻微孔颗粒绘制</td>
+                        <td class="py-3 text-orange-400"><strong>极致（最强）</strong>：通过位图级像素处理和动态 Pattern 贴图，能够展现接近物理显微的超高质感。</td>
+                        <td class="py-3"><strong>优秀</strong>：依赖 `<pattern>` 平铺渲染，但在高分辨率 Retina 屏可能存在极小的图块对齐计算损耗。</td>
+                        <td class="py-3"><strong>一般</strong>：需合并渐变与 Base64 噪声矢量图。对于复杂异形裁切的边界抗锯齿能力较差。</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3 font-medium text-slate-100">动态形变（挤压弹性）</td>
+                        <td class="py-3">需要手动在 JS 循环中调整绘制的横向与纵向缩放，重绘成本与形变复杂度成正比。</td>
+                        <td class="py-3">通过修改父级容器的 `transform: scale()` 进行整体矩阵变换，路径内容可自适应无失真缩放。</td>
+                        <td class="py-3 text-orange-400"><strong>极致（最轻量）</strong>：调用 GPU Compositor，在 `will-change` 优化下几乎不触发重绘 (Repaint)。</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3 font-medium text-slate-100">高负载多元素测试</td>
+                        <td class="py-3">渲染一万个篮球依然流畅，无 DOM 节点内存压力。</td>
+                        <td class="py-3">节点树膨胀会导致垃圾回收频繁卡顿。</td>
+                        <td class="py-3">由于每个球由多层 DOM 组成，性能会快速衰退。</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </footer>
+
+    <!-- 物理引擎与性能监控核心脚本 -->
+    <script>
+        // --- 物理状态常量 & 配置 ---
+        const ballRadius = 50;
+        const stageHeight = 360;
+        const floorY = stageHeight - 15; // 触地线 (扣除地板阴影的边界高度)
+        
+        // 可由用户调整的物理配置项
+        const physics = {
+            gravity: 0.5,
+            bounce: 0.85,
+            squishFactor: 0.15, // 挤压强度
+            floorY: floorY,
+            ballRadius: ballRadius
+        };
+
+        // --- 初始化控制器组件 ---
+        const gravitySlider = document.getElementById('gravity-slider');
+        const gravityVal = document.getElementById('gravity-val');
+        const bounceSlider = document.getElementById('bounce-slider');
+        const bounceVal = document.getElementById('bounce-val');
+        const squishSlider = document.getElementById('squish-slider');
+        const squishVal = document.getElementById('squish-val');
+        const btnKick = document.getElementById('btn-kick');
+
+        gravitySlider.addEventListener('input', (e) => {
+            physics.gravity = parseFloat(e.target.value);
+            gravityVal.textContent = physics.gravity.toFixed(2) + ' px/frame²';
+        });
+        bounceSlider.addEventListener('input', (e) => {
+            physics.bounce = parseFloat(e.target.value);
+            bounceVal.textContent = physics.bounce.toFixed(2);
+        });
+        squishSlider.addEventListener('input', (e) => {
+            physics.squishFactor = parseFloat(e.target.value);
+            squishVal.textContent = Math.round(physics.squishFactor * 100) + '% 最大形变';
+        });
+
+        // --- 物理引擎核心状态 ---
+        class PhysicalBall {
+            constructor(startY = 100) {
+                this.y = startY;
+                this.vy = 0;
+                this.scaleX = 1;
+                this.scaleY = 1;
+                this.isSquishing = false;
+                this.squishProgress = 0;
+            }
+
+            update() {
+                // 如果处于触地撞击形变状态，进行形变物理插值，不产生位移
+                if (this.isSquishing) {
+                    this.squishProgress += 0.25; // 压缩与复原速度
+                    if (this.squishProgress <= 1.0) {
+                        // 压缩阶段 (向下挤压，横向变胖)
+                        const sine = Math.sin(this.squishProgress * Math.PI);
+                        this.scaleY = 1 - (physics.squishFactor * sine);
+                        this.scaleX = 1 + (physics.squishFactor * sine * 0.7); // 体积守恒
+                    } else {
+                        // 结束形变，开始反弹上升
+                        this.isSquishing = false;
+                        this.scaleX = 1;
+                        this.scaleY = 1;
+                        // 应用弹性削减系数反向运动
+                        this.vy = -this.vy * physics.bounce;
+                        this.y = physics.floorY - physics.ballRadius;
+                    }
+                } else {
+                    // 常规自由落体与运动逻辑
+                    this.vy += physics.gravity;
+                    this.y += this.vy;
+
+                    // 触地检测
+                    if (this.y + physics.ballRadius >= physics.floorY) {
+                        // 阻尼回弹，进入形变计算
+                        this.y = physics.floorY - physics.ballRadius;
+                        
+                        // 如果速度极低，则让其静止在地面，不触发形变
+                        if (Math.abs(this.vy) < 0.8) {
+                            this.vy = 0;
+                        } else {
+                            this.isSquishing = true;
+                            this.squishProgress = 0;
+                        }
+                    }
+                }
+            }
+
+            kick() {
+                // 模拟向下拍击
+                this.vy = 12;
+                this.isSquishing = false;
+                this.scaleX = 1;
+                this.scaleY = 1;
+            }
+        }
+
+        // 创建三个独立运动状态的球（模拟三种模式），使它们的运动周期绝对一致
+        const canvasBall = new PhysicalBall(50);
+        const svgBallState = new PhysicalBall(50);
+        const cssBallState = new PhysicalBall(50);
+
+        btnKick.addEventListener('click', () => {
+            canvasBall.kick();
+            svgBallState.kick();
+            cssBallState.kick();
+        });
+
+
+        // ==========================================
+        // 1. CANVAS API 绘制实现 (细腻光影与微粒)
+        // ==========================================
+        const canvas = document.getElementById('canvas-stage');
+        const ctx = canvas.getContext('2d');
+        let leatherPattern = null;
+
+        // 离屏Canvas预生成真皮材质纹理，防止主循环每帧计算像素破坏性能
+        function preRenderLeatherPattern() {
+            const patternCanvas = document.createElement('canvas');
+            patternCanvas.width = 4;
+            patternCanvas.height = 4;
+            const pCtx = patternCanvas.getContext('2d');
+            pCtx.fillStyle = '#ff751a'; // 橙色基底
+            pCtx.fillRect(0, 0, 4, 4);
+            
+            // 暗色颗粒
+            pCtx.fillStyle = '#802b00';
+            pCtx.globalAlpha = 0.65;
+            pCtx.beginPath();
+            pCtx.arc(1, 1, 0.7, 0, Math.PI * 2);
+            pCtx.fill();
+
+            // 亮色高光微粒
+            pCtx.fillStyle = '#ff9955';
+            pCtx.globalAlpha = 0.4;
+            pCtx.beginPath();
+            pCtx.arc(3, 3, 0.7, 0, Math.PI * 2);
+            pCtx.fill();
+
+            leatherPattern = ctx.createPattern(patternCanvas, 'repeat');
+        }
+        preRenderLeatherPattern();
+
+        function drawCanvasBall(ball) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            // 当形变发生时，由于物理形变以地表为基准缩放，原点需移动到触地面
+            const centerY = ball.isSquishing ? physics.floorY : ball.y + physics.ballRadius;
+
+            // 绘制地表反向阴影
+            const shadowWidth = 40 * (centerY / physics.floorY) * ball.scaleX;
+            const shadowOpacity = Math.max(0.1, 0.5 * (1 - (centerY / physics.floorY)));
+            
+            ctx.beginPath();
+            ctx.ellipse(centerX, physics.floorY + 2, shadowWidth, 5, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(0,0,0,${shadowOpacity})`;
+            ctx.fill();
+
+            // 保存画布状态
+            ctx.save();
+            
+            // 物理变换 (触地面拉伸变换)
+            if (ball.isSquishing) {
+                ctx.translate(centerX, physics.floorY);
+                ctx.scale(ball.scaleX, ball.scaleY);
+                ctx.translate(-centerX, -physics.floorY);
+            }
+
+            // 篮球核心圆形剪裁（用于精细纹理映射）
+            ctx.beginPath();
+            const drawY = ball.isSquishing ? physics.floorY - physics.ballRadius : ball.y + physics.ballRadius;
+            ctx.arc(centerX, drawY, physics.ballRadius, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.save();
+            ctx.clip();
+
+            // A. 填充基础皮革微孔纹理
+            ctx.fillStyle = leatherPattern;
+            ctx.fillRect(centerX - physics.ballRadius, drawY - physics.ballRadius, physics.ballRadius * 2, physics.ballRadius * 2);
+
+            // B. 绘制黑线凹槽与皮缝线条 (根据透视刻画)
+            ctx.strokeStyle = '#1a0a00';
+            ctx.lineCap = 'round';
+
+            // 外围密封黑边
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(centerX, drawY, physics.ballRadius - 1, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 1. 垂直与水平中心线 (带极小弧度)
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(centerX, drawY - physics.ballRadius);
+            ctx.lineTo(centerX, drawY + physics.ballRadius);
+            ctx.moveTo(centerX - physics.ballRadius, drawY);
+            ctx.lineTo(centerX + physics.ballRadius, drawY);
+            ctx.stroke();
+
+            // 2. 真实缝合筋线（二次贝塞尔曲线精确刻画）
+            ctx.lineWidth = 2.5;
+            // 左曲弧度
+            ctx.beginPath();
+            ctx.moveTo(centerX - 35, drawY - 35);
+            ctx.quadraticCurveTo(centerX, drawY - 10, centerX - 35, drawY + 35);
+            ctx.stroke();
+            // 右曲弧度
+            ctx.beginPath();
+            ctx.moveTo(centerX + 35, drawY - 35);
+            ctx.quadraticCurveTo(centerX, drawY - 10, centerX + 35, drawY + 35);
+            ctx.stroke();
+
+            // C. 叠加立体球面阴影与3D反光
+            const lightingGradient = ctx.createRadialGradient(
+                centerX - 15, drawY - 15, 5, 
+                centerX, drawY, physics.ballRadius
+            );
+            lightingGradient.addColorStop(0, 'rgba(255, 255, 255, 0.25)'); // 高光区
+            lightingGradient.addColorStop(0.4, 'rgba(0, 0, 0, 0)');
+            lightingGradient.addColorStop(1, 'rgba(0, 0, 0, 0.55)'); // 暗部阴影
+            
+            ctx.fillStyle = lightingGradient;
+            ctx.beginPath();
+            ctx.arc(centerX, drawY, physics.ballRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 还原画布上下文
+            ctx.restore();
+            ctx.restore();
+        }
+
+
+        // ==========================================
+        // 2. SVG 状态更新与渲染映射
+        // ==========================================
+        const svgEl = document.getElementById('svg-element');
+        const svgShadow = document.getElementById('svg-shadow');
+
+        function updateSVGDom(ball) {
+            // 计算渲染坐标 (以底部居中为原点转换)
+            const currentY = ball.y;
+            
+            // 改变形变属性
+            svgEl.style.transform = `translate3d(0, ${currentY}px, 0) scale(${ball.scaleX}, ${ball.scaleY})`;
+            
+            // 调节投影明暗度与缩放
+            const relativeHeight = (currentY + physics.ballRadius) / physics.floorY;
+            const shadowScale = relativeHeight * ball.scaleX;
+            const shadowOpacity = Math.max(0.1, 0.6 * (1 - relativeHeight));
+            svgShadow.style.transform = `scaleX(${shadowScale})`;
+            svgShadow.style.opacity = shadowOpacity;
+        }
+
+
+        // ==========================================
+        // 3. CSS SHAPES 状态更新与渲染映射
+        // ==========================================
+        const cssBallEl = document.getElementById('css-ball-el');
+        const cssShadow = document.getElementById('css-shadow');
+
+        function updateCSSDom(ball) {
+            const currentY = ball.y;
+            
+            // 使用 CSS Transform 实现流畅的硬件级渲染
+            cssBallEl.style.transform = `translate3d(0, ${currentY}px, 0) scale(${ball.scaleX}, ${ball.scaleY})`;
+
+            // 地面阴影变换
+            const relativeHeight = (currentY + physics.ballRadius) / physics.floorY;
+            const shadowScale = relativeHeight * ball.scaleX;
+            const shadowOpacity = Math.max(0.1, 0.6 * (1 - relativeHeight));
+            cssShadow.style.transform = `scaleX(${shadowScale})`;
+            cssShadow.style.opacity = shadowOpacity;
+        }
+
+
+        // ==========================================
+        // 4. 实时性能监控与基准沙盒循环
+        // ==========================================
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fpsTimer = 0;
+
+        const fpsCanvas = document.getElementById('canvas-fps');
+        const fpsSvg = document.getElementById('svg-fps');
+        const fpsCss = document.getElementById('css-fps');
+
+        function mainPhysicsLoop() {
+            // 物理周期更新 (保证三种技术的动画帧率完全同步)
+            canvasBall.update();
+            svgBallState.update();
+            cssBallState.update();
+
+            // 1. 绘制 Canvas
+            drawCanvasBall(canvasBall);
+
+            // 2. 更新 SVG 位置
+            updateSVGDom(svgBallState);
+
+            // 3. 更新 CSS 位置
+            updateCSSDom(cssBallState);
+
+            // 性能侦测计算 (帧率统计)
+            const now = performance.now();
+            const delta = now - lastTime;
+            frameCount++;
+            fpsTimer += delta;
+
+            if (fpsTimer >= 1000) {
+                const currentFPS = Math.round((frameCount * 1000) / fpsTimer);
+                
+                // 由于三种技术同时在单个页面活跃渲染，所以当前浏览器的整体主渲染线程帧数是共享的
+                fpsCanvas.textContent = `${currentFPS} FPS`;
+                fpsSvg.textContent = `${currentFPS} FPS`;
+                fpsCss.textContent = `${currentFPS} FPS`;
+                
+                frameCount = 0;
+                fpsTimer = 0;
+            }
+            lastTime = now;
+
+            requestAnimationFrame(mainPhysicsLoop);
+        }
+
+        // 启动主渲染环
+        window.onload = function() {
+            mainPhysicsLoop();
+        }
+    </script>
+</body>
+</html>

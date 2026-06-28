@@ -1,0 +1,122 @@
+[
+  {
+    "id": "antenna-visualization",
+    "category": "antenna",
+    "title": "天线可视化",
+    "titleEn": "Antenna Visualization",
+    "description": "交互式天线辐射方向图可视化，展示不同天线类型的电磁辐射特性",
+    "tags": ["天线", "辐射方向图", "可视化"],
+    "path": "sims/antenna/antenna-visualization.html",
+    "version": "1.0"
+  },
+  {
+    "id": "dipole-em-wave",
+    "category": "antenna",
+    "title": "偶极子电磁波",
+    "titleEn": "Dipole Electromagnetic Wave",
+    "description": "偶极子天线产生的电磁波传播动画，直观展示电场与磁场的正交关系",
+    "tags": ["偶极子", "电磁波", "电场", "磁场"],
+    "path": "sims/antenna/偶极子电磁波.html",
+    "version": "1.0"
+  },
+  {
+    "id": "omni-directional-radiation",
+    "category": "antenna",
+    "title": "全向与定向辐射",
+    "titleEn": "Omni vs Directional Radiation",
+    "description": "对比全向天线与定向天线的辐射模式，展示波束形成的基本原理",
+    "tags": ["全向天线", "定向天线", "波束", "对比"],
+    "path": "sims/antenna/全向与定向辐射.html",
+    "version": "1.0"
+  },
+  {
+    "id": "antenna-radiation-sim",
+    "category": "antenna",
+    "title": "天线辐射仿真",
+    "titleEn": "Antenna Radiation Simulation",
+    "description": "综合天线辐射仿真工具，支持参数调节与实时辐射图更新",
+    "tags": ["天线", "辐射仿真", "参数调节"],
+    "path": "sims/antenna/天线辐射仿真.html",
+    "version": "1.0"
+  },
+  {
+    "id": "radar-equation",
+    "category": "antenna",
+    "title": "雷达方程与窄波束",
+    "titleEn": "Radar Equation & Narrow Beam",
+    "description": "雷达方程计算器与窄波束电磁辐射仿真，理解雷达探测原理",
+    "tags": ["雷达", "方程", "窄波束", "电磁辐射"],
+    "path": "sims/antenna/雷达方程与窄波束电磁辐射仿真.html",
+    "version": "1.0"
+  },
+  {
+    "id": "birth-of-antenna",
+    "category": "field-kinematics",
+    "title": "天线的诞生",
+    "titleEn": "Birth of an Antenna",
+    "description": "麦克斯韦电磁辐射与干涉相消物理可视化 — 探索天线如何将导行波转化为自由空间电磁波",
+    "tags": ["麦克斯韦", "干涉相消", "电磁辐射", "物理可视化"],
+    "path": "sims/field-kinematics/天线的诞生.html",
+    "version": "1"
+  },
+  {
+    "id": "birth-of-antenna-2",
+    "category": "field-kinematics",
+    "title": "天线的诞生 v2",
+    "titleEn": "Birth of an Antenna v2",
+    "description": "增强版：更丰富的场线动画与交互控制，深入理解近场到远场的过渡",
+    "tags": ["麦克斯韦", "近场", "远场", "场线动画"],
+    "path": "sims/field-kinematics/天线的诞生1.html",
+    "version": "2"
+  },
+  {
+    "id": "birth-of-antenna-3",
+    "category": "field-kinematics",
+    "title": "天线的诞生 v3",
+    "titleEn": "Birth of an Antenna v3",
+    "description": "加入时域演化和多频率分析，观察不同频率下的辐射模式变化",
+    "tags": ["时域演化", "多频率", "辐射模式"],
+    "path": "sims/field-kinematics/天线的诞生2.html",
+    "version": "3"
+  },
+  {
+    "id": "birth-of-antenna-4",
+    "category": "field-kinematics",
+    "title": "天线的诞生 v4",
+    "titleEn": "Birth of an Antenna v4",
+    "description": "增加干涉相消的定量分析，可视化驻波与行波的转换过程",
+    "tags": ["干涉相消", "驻波", "行波", "定量分析"],
+    "path": "sims/field-kinematics/天线的诞生3.html",
+    "version": "4"
+  },
+  {
+    "id": "birth-of-antenna-5",
+    "category": "field-kinematics",
+    "title": "天线的诞生 v5",
+    "titleEn": "Birth of an Antenna v5",
+    "description": "终极版：完整的麦克斯韦方程组可视化，包含边界条件与阻抗匹配动画",
+    "tags": ["麦克斯韦方程组", "边界条件", "阻抗匹配", "完整版"],
+    "path": "sims/field-kinematics/天线的诞生4.html",
+    "version": "5"
+  },
+  {
+    "id": "bouncing-ball",
+    "category": "mechanics",
+    "title": "拍篮球物理仿真",
+    "titleEn": "Bouncing Ball Physics",
+    "description": "经典物理力学仿真：篮球自由落体与弹性碰撞，实时显示速度、加速度与能量转换",
+    "tags": ["物理", "力学", "弹性碰撞", "能量守恒"],
+    "path": "sims/mechanics/拍篮球.html",
+    "version": "1.0"
+  },
+  {
+    "id": "circuit-simulator",
+    "category": "circuit",
+    "title": "电路仿真器",
+    "titleEn": "Circuit Simulator (EDA)",
+    "description": "原理图编辑器 + DC 工作点分析 + 波形查看器，支持电阻/电压源/电流源/接地，基于 MNA 求解器",
+    "tags": ["电路", "EDA", "SPICE", "MNA", "React"],
+    "path": "sims/circuit/index.html",
+    "version": "1.0"
+  }
+]

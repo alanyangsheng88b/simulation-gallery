@@ -1,0 +1,2802 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>麦克斯韦电磁辐射与干涉相消物理可视化模拟</title>
+<style>
+:root {
+--bg-color: #030305;
+--panel-bg: rgba(10, 12, 22, 0.92);
+--border-color: rgba(0, 242, 254, 0.25);
+--text-color: #d1d9e6;
+--accent-cyan: #00f2fe;
+--accent-amber: #ffaa00;
+--accent-green: #39ff14;
+--accent-magenta: #ff007f;
+}
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+}
+
+/* 布局容器 */
+#app-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* 画布区域：左边动画演示 */
+#canvas-container {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at center, #0a0e1c 0%, #020204 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
+  background-color: #000;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* 1:1 比例适配样式 */
+#canvas-container.square-mode canvas {
+  aspect-ratio: 1 / 1;
+  max-height: 90vh;
+  max-width: 90vh;
+}
+
+/* 控制面板：右边交互控制 */
+#control-panel {
+  width: 420px;
+  height: 100%;
+  background: var(--panel-bg);
+  border-left: 1px solid var(--border-color);
+  backdrop-filter: blur(15px);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.8);
+  overflow-y: auto;
+}
+
+.panel-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.panel-header h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(0, 242, 254, 0.6);
+  margin-bottom: 5px;
+  letter-spacing: 0.5px;
+}
+
+.panel-header p {
+  font-size: 0.75rem;
+  color: #7f8fa4;
+}
+
+.section {
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(0, 242, 254, 0.1);
+}
+
+.section-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent-cyan);
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+/* 可编辑文本全局交互样式 */
+[contenteditable="true"] {
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+[contenteditable="true"]:hover {
+  outline: 1px dashed rgba(0, 242, 254, 0.6);
+  outline-offset: 4px;
+  cursor: text;
+}
+
+[contenteditable="true"]:focus {
+  outline: 1px solid var(--accent-cyan);
+  outline-offset: 4px;
+  background: rgba(0, 242, 254, 0.08);
+  color: #fff;
+}
+
+/* 控件样式 */
+.btn-group-full {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sub-control-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 242, 254, 0.1);
+}
+
+button {
+  background: rgba(0, 242, 254, 0.03);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+  color: var(--text-color);
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+button:hover {
+  background: rgba(0, 242, 254, 0.1);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 8px rgba(0, 242, 254, 0.2);
+}
+
+button.active {
+  background: linear-gradient(90deg, rgba(0, 242, 254, 0.2), rgba(0, 242, 254, 0.05));
+  color: #fff;
+  font-weight: 700;
+  border-left: 4px solid var(--accent-cyan);
+  border-top-color: rgba(0, 242, 254, 0.3);
+  border-right-color: rgba(0, 242, 254, 0.3);
+  border-bottom-color: rgba(0, 242, 254, 0.3);
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
+}
+
+.control-row {
+  margin-bottom: 15px;
+}
+
+.control-row:last-child {
+  margin-bottom: 0;
+}
+
+.control-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #9cb0c9;
+  margin-bottom: 6px;
+}
+
+.control-value {
+  font-family: monospace;
+  color: var(--accent-cyan);
+  font-weight: bold;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--accent-cyan);
+  transition: transform 0.1s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.toggle-row span {
+  font-size: 0.75rem;
+  color: #a4b3c6;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 18px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.08);
+  transition: .3s;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 12px;
+  width: 12px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #7f8fa4;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: rgba(0, 242, 254, 0.2);
+  border-color: var(--accent-cyan);
+}
+
+input:checked + .slider:before {
+  transform: translateX(18px);
+  background-color: var(--accent-cyan);
+}
+
+/* 物理方程展示区域 */
+#equation-panel {
+  padding: 12px;
+  background: rgba(3, 3, 5, 0.95);
+  border: 1px solid rgba(0, 242, 254, 0.15);
+  border-radius: 6px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.eq-item {
+  margin-bottom: 8px;
+  padding: 6px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.eq-item.active-eq {
+  background: rgba(0, 242, 254, 0.08);
+  border-left: 2px solid var(--accent-cyan);
+}
+
+.eq-latex {
+  color: #fff;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.eq-desc {
+  color: #7f8fa4;
+  font-size: 0.68rem;
+}
+
+/* 文本与数字输入框 */
+.text-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+  color: var(--text-color);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  outline: none;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.text-input:focus {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 242, 254, 0.05);
+  box-shadow: 0 0 8px rgba(0, 242, 254, 0.25);
+}
+
+/* 底部标注栏 */
+.panel-footer {
+  margin-top: auto;
+  padding: 15px;
+  border-top: 1px solid rgba(0, 242, 254, 0.1);
+  font-size: 0.7rem;
+  color: #556276;
+  text-align: center;
+}
+
+/* 整合后的联合遥测与波形终端 */
+.floating-panel {
+  position: absolute;
+  z-index: 5;
+  background: rgba(4, 5, 10, 0.92);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  resize: both;
+  overflow: hidden;
+  pointer-events: auto;
+  transition: height 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.floating-panel-header {
+  padding: 8px 12px;
+  background: rgba(0, 242, 254, 0.08);
+  border-bottom: 1px solid rgba(0, 242, 254, 0.2);
+  cursor: move;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: bold;
+  font-size: 0.75rem;
+  user-select: none;
+}
+
+.floating-panel-body {
+  padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-height: 0;
+  gap: 12px;
+}
+
+/* 缩略/收起状态样式 */
+.floating-panel.collapsed {
+  height: 35px !important;
+  min-height: 35px !important;
+  resize: none !important;
+}
+.floating-panel.collapsed .floating-panel-body {
+  display: none !important;
+}
+
+/* 折叠按钮 */
+.panel-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent-cyan);
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 0.8rem;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  transition: all 0.2s ease;
+}
+.panel-toggle-btn:hover {
+  background: rgba(0, 242, 254, 0.15);
+  box-shadow: 0 0 6px rgba(0, 242, 254, 0.4);
+}
+
+/* 联合终端专有尺寸 */
+#console-panel {
+  top: 20px;
+  left: 20px;
+  width: 320px;
+  height: 400px;
+  min-width: 260px;
+  min-height: 300px;
+  border-left: 4px solid var(--accent-cyan);
+}
+
+.hud-title {
+  color: var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-stat {
+  font-size: 0.72rem;
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  line-height: 1.2;
+}
+
+.hud-stat span {
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.console-section-title {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #7f8fa4;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+#drag-tip {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  pointer-events: none;
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  background: rgba(0,0,0,0.5);
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 3;
+}
+
+/* SVG 统一尺寸配置 */
+.icon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+}
+
+/* CSS 工具类 (消除内联样式) */
+.flex { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-4 { gap: 4px; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.relative { position: relative; }
+.hidden { display: none !important; }
+.p-0 { padding: 0 !important; }
+.text-xs { font-size: 0.6rem; opacity: 0.6; }
+
+@media (max-width: 1024px) {
+  body {
+    flex-direction: column;
+  }
+  #control-panel {
+    width: 100%;
+    height: 50%;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+  }
+  #canvas-container {
+    height: 50%;
+  }
+}
+
+</style>
+</head>
+<body>
+<!-- SVG 图标模板系统 -->
+<svg style="display:none">
+<symbol id="icon-scene" viewBox="0 0 24 24">
+<path d="M5 3l14 9-14 9V3z"/>
+</symbol>
+<symbol id="icon-adjust" viewBox="0 0 24 24">
+<path d="M20 7H4M20 12H4M20 17H4"/>
+</symbol>
+<symbol id="icon-visual" viewBox="0 0 24 24">
+<path d="M12 2.25a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75zM6.16 5.1a.75.75 0 0 1 1.06 0l1.59 1.59a.75.75 0 1 1-1.06 1.06L6.16 6.16a.75.75 0 0 1 0-1.06z"/>
+</symbol>
+<symbol id="icon-layers" viewBox="0 0 24 24">
+<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
+<circle cx="12" cy="12" r="3"/>
+</symbol>
+<symbol id="icon-formula" viewBox="0 0 24 24">
+<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 7H20v10H6.5a2.5 2.5 0 0 0-2.5 2.5v-14z"/>
+</symbol>
+</svg>
+<div id="app-container">
+<!-- 画布区 (左边动画演示) -->
+<div id="canvas-container">
+  <!-- 联合遥测与波形分析终端 (Console Panel) -->
+  <div id="console-panel" class="floating-panel">
+    <div class="floating-panel-header" id="console-drag-handle">
+      <div class="hud-title">
+        <span contenteditable="true">联合遥测与波形分析终端</span>
+      </div>
+      <div class="flex items-center gap-8">
+        <span class="text-xs">[拖拽/双击编辑]</span>
+        <button class="panel-toggle-btn" id="console-toggle-btn" title="一键折叠/展开" onclick="toggleConsole()">_</button>
+      </div>
+    </div>
+    <div class="floating-panel-body">
+      <!-- 上半叠层：实时遥测 -->
+      <div class="flex flex-col">
+        <div class="console-section-title">实时物理指标</div>
+        <div class="hud-mode-container text-xs" style="margin-bottom: 4px;">模式: <span id="hud-mode" style="color: var(--accent-cyan); font-weight: bold;">-</span></div>
+        <div class="hud-stat">扰动速度 c: <span id="hud-c" style="color: var(--accent-amber);">3.0 px/f</span></div>
+        <div class="hud-stat">接收子坐标: <span id="hud-rx" style="color: var(--accent-cyan);">-</span></div>
+        <div class="hud-stat">接收子中点距离: <span id="hud-dist" style="color: var(--accent-magenta);">-</span></div>
+        <div class="hud-stat">干涉辐射场量: <span id="hud-rad" style="color: var(--accent-green);">0.00</span></div>
+        <div class="hud-stat">干涉状态: <span id="hud-interference" style="color: #fff;">-</span></div>
+      </div>
+
+      <!-- 下半叠层：交变波形示波仪 -->
+      <div class="flex-col h-full relative" style="flex: 1;">
+        <div class="console-section-title">交变波形示波仪 (基于干涉总场)</div>
+        <div class="h-full relative p-0" style="flex: 1;">
+          <canvas id="scope-canvas" style="display:block; width:100%; height:100%; background:#020204;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="drag-tip" contenteditable="true">提示: [任意模式] 鼠标可拖拽绿色接收电子与终端面板；[电量控制] 可通过滑块自由修改任何源电荷的极性与大小(正值品红，负值青色)；[静态电荷] 可鼠标任意拖拽场源电荷实时重算电场线。</div>
+  <canvas id="physics-canvas"></canvas>
+</div>
+
+<!-- 控制面板区 (右边交互控制) -->
+<div id="control-panel">
+  <div class="panel-header">
+    <h1 contenteditable="true">麦克斯韦场动理学演示系统</h1>
+    <p contenteditable="true">基于严格推迟势矢量叠加的交变电磁辐射与干涉模拟</p>
+  </div>
+
+  <!-- 运动模式选择 -->
+  <div class="section">
+    <div class="section-title">
+      <svg class="icon"><use href="#icon-scene"/></svg>
+      动画演示场景
+    </div>
+    <div class="btn-group-full">
+      <button id="btn-mode-single" class="active" onclick="setMode('single')">
+        <span style="color: var(--accent-cyan);">●</span> <span>单电子自由运动 (匀速/振荡)</span>
+      </button>
+      <!-- 单电子二级子切换控制组 -->
+      <div id="sub-single-controls" class="sub-control-group">
+        <button id="btn-single-uniform" class="w-full active" onclick="setSingleSubMode('uniform')" style="padding: 6px 10px; font-size: 0.75rem; justify-content: center;">匀速直线运动 (v = 恒定)</button>
+        <button id="btn-single-oscillate" class="w-full" onclick="setSingleSubMode('oscillate')" style="padding: 6px 10px; font-size: 0.75rem; justify-content: center;">简谐加速振荡 (产生辐射)</button>
+      </div>
+
+      <button id="btn-mode-parallel" onclick="setMode('parallel')">
+        <span style="color: var(--accent-amber);">●</span> <span>双线反向平行：干涉相消 (加粗双线)</span>
+      </button>
+      <button id="btn-mode-antenna" onclick="setMode('antenna')">
+        <span style="color: var(--accent-green);">●</span> <span>闭环长方形电路：闭合回路辐射</span>
+      </button>
+      <button id="btn-mode-static" onclick="setMode('static')">
+        <span style="color: #ff007f;">●</span> <span>静态电荷场 (正电荷/静电子模拟)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 全场景自适应统一电荷电量与极性控制区 -->
+  <div class="section" id="section-charge-controls">
+    <div class="section-title">
+      <svg class="icon"><use href="#icon-adjust"/></svg>
+      电荷电量与极性控制 (全场景动态交互)
+    </div>
+    
+    <!-- 仅在静态模式下显示的预设静电配置 -->
+    <div class="control-row" id="row-static-presets" style="display: none; margin-bottom: 12px;">
+      <div class="control-label"><span>预设静电配置</span></div>
+      <div class="flex gap-4" style="flex-wrap: wrap;">
+        <button id="btn-preset-dipole" class="active" onclick="setStaticPreset('dipole')" style="padding: 6px 8px; font-size: 0.7rem; flex: 1; justify-content: center;">等量异种 (+-)</button>
+        <button id="btn-preset-positive" onclick="setStaticPreset('positive')" style="padding: 6px 8px; font-size: 0.7rem; flex: 1; justify-content: center;">等量同正 (++)</button>
+        <button id="btn-preset-negative" onclick="setStaticPreset('negative')" style="padding: 6px 8px; font-size: 0.7rem; flex: 1; justify-content: center;">等量同负 (--)</button>
+      </div>
+    </div>
+
+    <!-- 电荷 A 控制滑块 -->
+    <div class="control-row" id="row-charge-a">
+      <div class="control-label">
+        <span id="label-charge-a">电荷 A 电量 (qA)</span>
+        <span class="control-value" id="val-charge-a">-1.0</span>
+      </div>
+      <input type="range" id="slide-charge-a" min="-2.0" max="2.0" step="0.1" value="-1.0">
+    </div>
+
+    <!-- 电荷 B 控制滑块 -->
+    <div class="control-row" id="row-charge-b" style="display: none;">
+      <div class="control-label">
+        <span id="label-charge-b">电荷 B 电量 (qB)</span>
+        <span class="control-value" id="val-charge-b">-1.0</span>
+      </div>
+      <input type="range" id="slide-charge-b" min="-2.0" max="2.0" step="0.1" value="-1.0">
+    </div>
+  </div>
+
+  <!-- 电荷标签管理 -->
+  <div class="section" id="section-labels">
+    <div class="section-title">
+      <svg class="icon"><use href="#icon-layers"/></svg>
+      电荷名字与标签设定
+    </div>
+    <div class="control-row">
+      <div class="control-label">
+        <span>标签字体大小 (Label Font Size)</span>
+        <span class="control-value" id="val-labelfontsize">12 px</span>
+      </div>
+      <input type="range" id="slide-labelfontsize" min="9" max="24" step="1" value="12">
+    </div>
+    <div class="control-row" id="row-name-0">
+      <div class="control-label"><span>电荷 1 标签名字</span></div>
+      <input type="text" id="input-name-0" value="源电荷 A" class="text-input">
+    </div>
+    <div class="control-row" id="row-name-1" style="display: none;">
+      <div class="control-label"><span>电荷 2 标签名字</span></div>
+      <input type="text" id="input-name-1" value="源电荷 B" class="text-input">
+    </div>
+    <div class="control-row" id="row-name-receiver">
+      <div class="control-label"><span>接收电子 标签名字</span></div>
+      <input type="text" id="input-name-receiver" value="探测器 C" class="text-input">
+    </div>
+  </div>
+
+  <!-- 物理场与交互几何精细调节 -->
+  <div class="section" id="section-physics-adjust">
+    <div class="section-title">
+      <svg class="icon"><use href="#icon-adjust"/></svg>
+      物理场与结构几何精细调节
+    </div>
+    
+    <!-- 光速 c -->
+    <div class="control-row" id="row-c-speed">
+      <div class="control-label">
+        <span>电磁扰动速度 (光速 c)</span>
+        <span class="control-value" id="val-c">3.00 px/f</span>
+      </div>
+      <input type="range" id="slide-c" min="1.5" max="5.0" step="0.1" value="3.0">
+    </div>
+
+    <!-- 双线间距 -->
+    <div class="control-row" id="row-spacing" style="display: none;">
+      <div class="control-label">
+        <span>双线导线间距 (d)</span>
+        <span class="control-value" id="val-spacing">80 px</span>
+      </div>
+      <input type="range" id="slide-spacing" min="0" max="100" step="5" value="80">
+    </div>
+
+    <!-- 闭环长方形调节（双轨联动） -->
+    <div class="control-row" id="row-rect-width" style="display: none;">
+      <div class="control-label">
+        <span>闭环电路宽度 (W)</span>
+        <span class="control-value" id="val-rect-width">200 px</span>
+      </div>
+      <div class="flex gap-8 items-center">
+        <input type="range" id="slide-rect-width" min="50" max="400" step="5" value="200" style="flex: 1;">
+        <input type="number" id="input-rect-width" min="50" max="400" step="5" value="200" class="text-input" style="width: 80px; padding: 4px 8px;">
+      </div>
+    </div>
+    <div class="control-row" id="row-rect-height" style="display: none;">
+      <div class="control-label">
+        <span>闭环电路高度 (H)</span>
+        <span class="control-value" id="val-rect-height">120 px</span>
+      </div>
+      <div class="flex gap-8 items-center">
+        <input type="range" id="slide-rect-height" min="30" max="300" step="5" value="120" style="flex: 1;">
+        <input type="number" id="input-rect-height" min="30" max="300" step="5" value="120" class="text-input" style="width: 80px; padding: 4px 8px;">
+      </div>
+    </div>
+
+    <!-- 闭环运动方式 -->
+    <div class="control-row" id="row-loop-motion" style="display: none;">
+      <div class="control-label">
+        <span>闭环电荷运动方式</span>
+        <span class="control-value" id="val-loop-motion">简谐振荡</span>
+      </div>
+      <div class="flex gap-8">
+        <button id="btn-loop-uniform" class="w-full" onclick="setLoopMotion('uniform')">匀速运动</button>
+        <button id="btn-loop-oscillate" class="w-full active" onclick="setLoopMotion('oscillate')">简谐振荡</button>
+      </div>
+    </div>
+
+    <!-- 电子速度/振幅等 -->
+    <div class="control-row" id="row-speed">
+      <div class="control-label">
+        <span>电子最高运行速度 (v / c)</span>
+        <span class="control-value" id="val-v">40%</span>
+      </div>
+      <input type="range" id="slide-v" min="10" max="90" step="5" value="40">
+    </div>
+
+    <!-- 振荡频率 f -->
+    <div class="control-row" id="row-freq" style="display: none;">
+      <div class="control-label">
+        <span>简谐振荡角频率 (ω)</span>
+        <span class="control-value" id="val-freq">0.05 rad/f</span>
+      </div>
+      <input type="range" id="slide-freq" min="0.01" max="0.15" step="0.01" value="0.05">
+    </div>
+
+    <!-- 振荡振幅 A -->
+    <div class="control-row" id="row-amp" style="display: none;">
+      <div class="control-label">
+        <span>振荡振幅 (A)</span>
+        <span class="control-value" id="val-amp">60 px</span>
+      </div>
+      <input type="range" id="slide-amp" min="10" max="150" step="5" value="60">
+    </div>
+  </div>
+
+  <!-- 画面与画布风格调整 -->
+  <div class="section">
+    <div class="section-title">
+      <svg class="icon"><use href="#icon-visual"/></svg>
+      画面与画布风格调整 (独立通道发光)
+    </div>
+
+    <!-- 画布显示大小比例 -->
+    <div class="control-row">
+      <div class="control-label">
+        <span>画布视口显示尺寸比例</span>
+        <span class="control-value" id="val-canvas-scale">100%</span>
+      </div>
+      <input type="range" id="slide-canvas-scale" min="50" max="120" step="5" value="100">
+    </div>
+
+    <!-- 示波器幅值调节 -->
+    <div class="control-row">
+      <div class="control-label">
+        <span>示波器波形幅值 (Scope Amp)</span>
+        <span class="control-value" id="val-scope-amp">100%</span>
+      </div>
+      <input type="range" id="slide-scope-amp" min="10" max="300" step="10" value="100">
+    </div>
+
+    <!-- 条线粗细 -->
+    <div class="control-row">
+      <div class="control-label">
+        <span>电场线/电线粗细 (Line Width)</span>
+        <span class="control-value" id="val-linewidth">1.5 px</span>
+      </div>
+      <input type="range" id="slide-linewidth" min="1.0" max="5.0" step="0.5" value="1.5">
+    </div>
+
+    <!-- 1. 电场线亮度 -->
+    <div class="control-row">
+      <div class="control-label">
+        <span>电场线发光强度 (E-Field Bloom)</span>
+        <span class="control-value" id="val-bloom-efield">15 px</span>
+      </div>
+      <input type="range" id="slide-bloom-efield" min="0" max="100" step="2" value="15">
+    </div>
+
+    <!-- 2. 磁感圈亮度 -->
+    <div class="control-row">
+      <div class="control-label">
+        <span>磁感圈发光强度 (B-Field Bloom)</span>
+        <span class="control-value" id="val-bloom-bfield">15 px</span>
+      </div>
+      <input type="range" id="slide-bloom-bfield" min="0" max="100" step="2" value="15">
+    </div>
+
+    <!-- 3. 辐射波纹亮度 -->
+    <div class="control-row">
+      <div class="control-label">
+        <span>辐射波纹发光强度 (Waves Bloom)</span>
+        <span class="control-value" id="val-bloom-waves">15 px</span>
+      </div>
+      <input type="range" id="slide-bloom-waves" min="0" max="100" step="2" value="15">
+    </div>
+
+    <!-- 4. 投影网格亮度 -->
+    <div class="control-row">
+      <div class="control-label">
+        <span>投影网格发光强度 (Grid Bloom)</span>
+        <span class="control-value" id="val-bloom-grid">15 px</span>
+      </div>
+      <input type="range" id="slide-bloom-grid" min="0" max="100" step="2" value="15">
+    </div>
+
+    <!-- 字体大小 -->
+    <div class="control-row">
+      <div class="control-label">
+        <span>UI 交互字体大小 (Font Size)</span>
+        <span class="control-value" id="val-fontsize">12 px</span>
+      </div>
+      <input type="range" id="slide-fontsize" min="10" max="16" step="1" value="12">
+    </div>
+  </div>
+
+  <!-- 渲染视觉图层选择 -->
+  <div class="section">
+    <div class="section-title">
+      <svg class="icon"><use href="#icon-layers"/></svg>
+      渲染视觉图层选择
+    </div>
+
+    <div class="toggle-row">
+      <span>三维透现投影网格</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-grid" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <span>显示绿色接收电子</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-receiver" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <span>推迟静电场线 (E-Field)</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-efield" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <span>环形磁感虚线 (B-Field)</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-bfield" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <span>横向扭折辐射波纹 (Radiation Waves)</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-waves" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <span>1:1 科普视频画幅适配</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-square">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- 物理公式互动解析 -->
+  <div class="section">
+    <div class="section-title">
+      <svg class="icon"><use href="#icon-formula"/></svg>
+      麦克斯韦方程组解析 (点击可编辑)
+    </div>
+    <div id="equation-panel">
+      <!-- 高斯电场定律 -->
+      <div class="eq-item" id="eq-gauss">
+        <div class="eq-latex" contenteditable="true">∇ · E = ρ / ε₀</div>
+        <div class="eq-desc" contenteditable="true">静止或匀速：电荷产生呈各向同性发散的库仑场，场源对称。</div>
+      </div>
+      <!-- 麦克斯韦-安培定律 -->
+      <div class="eq-item" id="eq-ampere">
+        <div class="eq-latex" contenteditable="true">∇ × B = μ₀J + μ₀ε₀ ∂E/∂t</div>
+        <div class="eq-desc" contenteditable="true">运动电荷与位移电流：随时间变化的电场产生环形磁场 B。</div>
+      </div>
+      <!-- 法拉第感应定律 -->
+      <div class="eq-item" id="eq-faraday">
+        <div class="eq-latex" contenteditable="true">∇ × E = -∂B/∂t</div>
+        <div class="eq-desc" contenteditable="true">加速运动：严格遵守矢量叠加原理，干涉区 E_total = ΣE_i = 0 时力线消隐。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-footer">
+    <div>物理计算核心：Run at 60 FPS</div>
+    <div style="margin-top: 4px;">由 Canvas 2D 矢量干涉推迟势引擎驱动</div>
+  </div>
+</div>
+
+</div>
+<script>
+// --- 极坐标和长方形几何投影算法 ---
+function getRectCoordinates(s, W, H, cx, cy) {
+const P = 2 * (W + H);
+s = ((s % P) + P) % P; // clamp to [0, P]
+const halfW = W / 2;
+const halfH = H / 2;
+let x, y, tx = 0, ty = 0;
+  if (s < W) {
+    // Segment 1: Top edge (Left to Right)
+    x = cx - halfW + s;
+    y = cy - halfH;
+    tx = 1; ty = 0;
+  } else if (s < W + H) {
+    // Segment 2: Right edge (Top to Bottom)
+    x = cx + halfW;
+    y = cy - halfH + (s - W);
+    tx = 0; ty = 1;
+  } else if (s < 2 * W + H) {
+    // Segment 3: Bottom edge (Right to Left)
+    x = cx + halfW - (s - W - H);
+    y = cy + halfH;
+    tx = -1; ty = 0;
+  } else {
+    // Segment 4: Left edge (Bottom to Top)
+    x = cx - halfW;
+    y = cy + halfH - (s - 2 * W - H);
+    tx = 0; ty = -1;
+  }
+  return { x, y, tx, ty };
+}
+
+function getClosestRectPerimeterPos(mx, my, W, H, cx, cy) {
+  const halfW = W / 2;
+  const halfH = H / 2;
+  const left = cx - halfW;
+  const right = cx + halfW;
+  const top = cy - halfH;
+  const bottom = cy + halfH;
+
+  // Projection to Segment 1 (Top)
+  const px1 = Math.max(left, Math.min(right, mx));
+  const py1 = top;
+  const d1 = Math.hypot(mx - px1, my - py1);
+
+  // Projection to Segment 2 (Right)
+  const px2 = right;
+  const py2 = Math.max(top, Math.min(bottom, my));
+  const d2 = Math.hypot(mx - px2, my - py2);
+
+  // Projection to Segment 3 (Bottom)
+  const px3 = Math.max(left, Math.min(right, mx));
+  const py3 = bottom;
+  const d3 = Math.hypot(mx - px3, my - py3);
+
+  // Projection to Segment 4 (Left)
+  const px4 = left;
+  const py4 = Math.max(top, Math.min(bottom, my));
+  const d4 = Math.hypot(mx - px4, my - py4);
+
+  const minDist = Math.min(d1, d2, d3, d4);
+  let s = 0;
+  if (minDist === d1) {
+    s = px1 - left;
+  } else if (minDist === d2) {
+    s = W + (py2 - top);
+  } else if (minDist === d3) {
+    s = W + H + (right - px3);
+  } else {
+    s = 2 * W + H + (bottom - py4);
+  }
+  return s;
+}
+
+// --- 物理常数与环境全局配置 ---
+const canvas = document.getElementById('physics-canvas');
+const ctx = canvas.getContext('2d');
+const canvasContainer = document.getElementById('canvas-container');
+const scopeCanvas = document.getElementById('scope-canvas');
+const sCtx = scopeCanvas.getContext('2d');
+
+// 默认全局物理状态配置
+const physics = {
+  c: 3.0,              // 扰动传播速度 (px/frame)
+  vRatio: 0.40,         // 电子最高运行速度比值 (v / c)
+  omega: 0.05,         // 角频率 (rad/frame)
+  amp: 60,             // 简谐振幅 (px)
+  mode: 'single',      // 模式：single | parallel | antenna | static
+  singleSubMode: 'uniform', // single 子模式: uniform | oscillate
+  wireSpacing: 80,     // 平行动线间距 (px)
+  bendAngle0: 0,       // 导线 1（上方）弯折角
+  bendAngle1: 0,       // 导线 2（下方）弯折角
+  activeRotateIdx: -1, // 当前正在鼠标旋转的导线索引：-1(无) | 0(上) | 1(下)
+  
+  // 统一电量核心状态
+  qA: -1.0,            // 电荷 A 实时电量
+  qB: -1.0,            // 电荷 B 实时电量
+  
+  // 闭环长方形专有状态
+  rectWidth: 200,      // 闭环宽度 (W)
+  rectHeight: 120,     // 闭环高度 (H)
+  rectS0: 0,           // 闭环电荷 1 轨道绝对起始偏置 (s)
+  rectS1: 280,         // 闭环电荷 2 轨道绝对起始偏置 (s)
+  loopMotionType: 'oscillate', // 闭合回路模式：'uniform'(匀速) | 'oscillate'(简谐)
+
+  canvasScale: 100,    // 画布比例大小 (%)
+  scopeAmp: 1.0,       // 示波器幅值倍率
+  labelFontSize: 12,   // 标签名字体大小 (px)
+  electronNames: ["源电荷 A", "源电荷 B", "探测器 C"], 
+  lineWidth: 1.5,      // 线条粗细
+  bloomEField: 15,     // 1. 电场发光强度
+  bloomBField: 15,     // 2. 磁感发光强度
+  bloomWaves: 15,      // 3. 辐射波纹发光强度
+  bloomGrid: 15,       // 4. 网格发光强度
+  fontSize: 12,        // 字体大小
+  showGrid: true,
+  showReceiver: true,  
+  showEField: true,
+  showBField: true,
+  showWaves: true,
+  time: 0
+};
+
+// 静态电荷场电荷集
+let staticCharges = [];
+
+// 接收电场辐射的第三个电子 (绿色，鼠标可拖拽)
+const receiver = {
+  x: 0,
+  y: 0,
+  radius: 10,
+  isDragging: false,
+  measuredE: 0, 
+  rawSignedE: 0 
+};
+
+// 示波器历史缓存
+const scopeHistory = [];
+const maxScopePoints = 160;
+
+// 鼠标状态追踪
+let activeElectron = null;
+let activeStaticCharge = null;
+
+// --- 电子粒子基类 ---
+class Electron {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.ax = 0;
+    this.ay = 0;
+    this.q = -1.0;     // 电量属性，动态绑定
+    
+    // 运动原点
+    this.ox = x;
+    this.oy = y;
+
+    // 存储历史运动轨迹
+    this.history = [];
+    this.maxHistory = 800;
+    this.isDragging = false;
+    this.wasDragging = false; 
+  }
+
+  update(t, mode, index = 0) {
+    if (this.isDragging) {
+      this.vx = 0;
+      this.vy = 0;
+      this.ax = 0;
+      this.ay = 0;
+      this.wasDragging = true;
+      this.history.unshift({ x: this.x, y: this.y, vx: 0, vy: 0, ax: 0, ay: 0, t: t });
+      if (this.history.length > this.maxHistory) this.history.pop();
+      return;
+    }
+
+    if (this.wasDragging) {
+      this.history = [];
+      this.wasDragging = false;
+    }
+
+    const lastX = this.x;
+    const lastY = this.y;
+    const lastVx = this.vx;
+    const lastVy = this.vy;
+
+    const maxSpeed = physics.c * physics.vRatio;
+
+    if (mode === 'single') {
+      if (physics.singleSubMode === 'uniform') {
+        // 匀速直线运动
+        this.vx = maxSpeed;
+        this.vy = 0;
+        this.x += this.vx;
+        this.y = this.oy;
+        
+        const margin = 100;
+        if (this.x > canvas.width / devicePixelRatio + margin) {
+          this.x = -margin;
+          this.history = []; 
+        }
+      } else {
+        // 单电子简谐振荡
+        this.x = this.ox;
+        this.y = this.oy + physics.amp * Math.sin(physics.omega * t);
+        this.vx = 0;
+        this.vy = physics.amp * physics.omega * Math.cos(physics.omega * t);
+      }
+    } 
+    else if (mode === 'parallel') {
+      // 导线自适应分开调节的弯折轨道算法
+      const dir = (index === 0) ? 1 : -1;
+      const s = dir * physics.amp * Math.sin(physics.omega * t); 
+      const currentAngle = (index === 0) ? physics.bendAngle0 : physics.bendAngle1;
+
+      if (s < 0) {
+        this.x = this.ox + s;
+        this.y = this.oy;
+        this.vx = dir * physics.amp * physics.omega * Math.cos(physics.omega * t);
+        this.vy = 0;
+      } else {
+        this.x = this.ox + s * Math.cos(currentAngle);
+        this.y = this.oy + s * Math.sin(currentAngle);
+        this.vx = dir * physics.amp * physics.omega * Math.cos(physics.omega * t) * Math.cos(currentAngle);
+        this.vy = dir * physics.amp * physics.omega * Math.cos(physics.omega * t) * Math.sin(currentAngle);
+      }
+    }
+    else if (mode === 'antenna') {
+      // 闭环长方形电路运动模式：两个电子顺时针环绕
+      const W = physics.rectWidth;
+      const H = physics.rectHeight;
+
+      // 计算电荷在沿电路的位置路程 s
+      const motionVal = (physics.loopMotionType === 'oscillate') ?
+        physics.amp * Math.sin(physics.omega * t) :
+        maxSpeed * t;
+
+      const baseS = (index === 0) ? physics.rectS0 : physics.rectS1;
+      const s = baseS + motionVal;
+
+      const coord = getRectCoordinates(s, W, H, this.ox, this.oy);
+      this.x = coord.x;
+      this.y = coord.y;
+
+      // 物理切线速度
+      const vScalar = (physics.loopMotionType === 'oscillate') ?
+        physics.amp * physics.omega * Math.cos(physics.omega * t) :
+        maxSpeed;
+
+      this.vx = vScalar * coord.tx;
+      this.vy = vScalar * coord.ty;
+    }
+
+    // 计算物理加速度
+    if (lastX === this.x && lastY === this.y) {
+      this.ax = 0;
+      this.ay = 0;
+    } else {
+      this.ax = this.vx - lastVx;
+      this.ay = this.vy - lastVy;
+    }
+
+    // 压入推迟历史队列
+    this.history.unshift({
+      x: this.x,
+      y: this.y,
+      vx: this.vx,
+      vy: this.vy,
+      ax: this.ax,
+      ay: this.ay,
+      t: t
+    });
+
+    if (this.history.length > this.maxHistory) {
+      this.history.pop();
+    }
+  }
+
+  getRetardedState(px, py, currentT) {
+    if (this.history.length === 0) {
+      return { x: this.x, y: this.y, vx: this.vx, vy: this.vy, ax: 0, ay: 0, t: currentT };
+    }
+
+    let bestSlice = this.history[0];
+    let minDiff = Infinity;
+
+    for (let i = 0; i < this.history.length; i++) {
+      const state = this.history[i];
+      const dist = Math.hypot(px - state.x, py - state.y);
+      const timeTravel = dist / physics.c;
+      const diff = Math.abs((currentT - state.t) - timeTravel);
+
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestSlice = state;
+      } else if (diff > minDiff && i > 15) {
+        break;
+      }
+    }
+    return bestSlice;
+  }
+}
+
+// 初始化电子实体
+let electrons = [];
+function initPhysics() {
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+  
+  if (receiver.x === 0 && receiver.y === 0) {
+    receiver.x = w * 0.8;
+    receiver.y = h * 0.3;
+  }
+
+  if (physics.mode === 'single') {
+    electrons = [new Electron(w * 0.25, h * 0.5)];
+  } 
+  else if (physics.mode === 'parallel') {
+    electrons = [
+      new Electron(w * 0.5, h * 0.5 - physics.wireSpacing / 2), 
+      new Electron(w * 0.5, h * 0.5 + physics.wireSpacing / 2)  
+    ];
+  }
+  else if (physics.mode === 'antenna') {
+    electrons = [
+      new Electron(w * 0.5, h * 0.5), 
+      new Electron(w * 0.5, h * 0.5)
+    ];
+    
+    // 分开两电荷偏置
+    const P = 2 * (physics.rectWidth + physics.rectHeight);
+    physics.rectS0 = 0;
+    physics.rectS1 = P / 2;
+  }
+  
+  // 初始化物理参数绑定
+  applyChargesToEntities();
+}
+
+// 统一应用电量至实体中
+function applyChargesToEntities() {
+  if (physics.mode === 'static') {
+    if (staticCharges[0]) {
+      staticCharges[0].q = physics.qA;
+      staticCharges[0].label = physics.qA >= 0 ? '正电荷 A' : '负电荷 A';
+    }
+    if (staticCharges[1]) {
+      staticCharges[1].q = physics.qB;
+      staticCharges[1].label = physics.qB >= 0 ? '正电荷 B' : '负电荷 B';
+    }
+  } else {
+    if (electrons[0]) electrons[0].q = physics.qA;
+    if (electrons[1]) electrons[1].q = physics.qB;
+  }
+}
+
+// --- 界面窗口自适应 ---
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvasContainer.getBoundingClientRect();
+  const scaleMultiplier = physics.canvasScale / 100;
+  
+  if (canvasContainer.classList.contains('square-mode')) {
+    const side = Math.min(rect.width, rect.height, 900) * scaleMultiplier;
+    canvas.width = side * dpr;
+    canvas.height = side * dpr;
+    canvas.style.width = `${side}px`;
+    canvas.style.height = `${side}px`;
+  } else {
+    const targetW = rect.width * scaleMultiplier;
+    const targetH = rect.height * scaleMultiplier;
+    canvas.width = targetW * dpr;
+    canvas.height = targetH * dpr;
+    canvas.style.width = `${targetW}px`;
+    canvas.style.height = `${targetH}px`;
+  }
+  ctx.scale(dpr, dpr);
+  initPhysics();
+}
+
+// --- UI 交互绑定与控制 ---
+const slideC = document.getElementById('slide-c');
+const slideV = document.getElementById('slide-v');
+const slideFreq = document.getElementById('slide-freq');
+const slideAmp = document.getElementById('slide-amp');
+const slideLineWidth = document.getElementById('slide-linewidth');
+const slideBloomEField = document.getElementById('slide-bloom-efield');
+const slideBloomBField = document.getElementById('slide-bloom-bfield');
+const slideBloomWaves = document.getElementById('slide-bloom-waves');
+const slideBloomGrid = document.getElementById('slide-bloom-grid');
+const slideFontSize = document.getElementById('slide-fontsize');
+const slideSpacing = document.getElementById('slide-spacing');
+const slideCanvasScale = document.getElementById('slide-canvas-scale');
+const slideScopeAmp = document.getElementById('slide-scope-amp');
+const slideLabelFontSize = document.getElementById('slide-labelfontsize');
+
+// 闭合回路控制
+const slideRectWidth = document.getElementById('slide-rect-width');
+const inputRectWidth = document.getElementById('input-rect-width');
+const slideRectHeight = document.getElementById('slide-rect-height');
+const inputRectHeight = document.getElementById('input-rect-height');
+const valRectWidth = document.getElementById('val-rect-width');
+const valRectHeight = document.getElementById('val-rect-height');
+
+// 统一重构电量控制
+const slideChargeA = document.getElementById('slide-charge-a');
+const slideChargeB = document.getElementById('slide-charge-b');
+const valChargeA = document.getElementById('val-charge-a');
+const valChargeB = document.getElementById('val-charge-b');
+
+const valC = document.getElementById('val-c');
+const valV = document.getElementById('val-v');
+const valFreq = document.getElementById('val-freq');
+const valAmp = document.getElementById('val-amp');
+const valLineWidth = document.getElementById('val-linewidth');
+const valBloomEField = document.getElementById('val-bloom-efield');
+const valBloomBField = document.getElementById('val-bloom-bfield');
+const valBloomWaves = document.getElementById('val-bloom-waves');
+const valBloomGrid = document.getElementById('val-bloom-grid');
+const valFontSize = document.getElementById('val-fontsize');
+const valSpacing = document.getElementById('val-spacing');
+const valCanvasScale = document.getElementById('val-canvas-scale');
+const valScopeAmp = document.getElementById('val-scope-amp');
+const valLabelFontSize = document.getElementById('val-labelfontsize');
+
+const toggleGrid = document.getElementById('toggle-grid');
+const toggleEField = document.getElementById('toggle-efield');
+const toggleBField = document.getElementById('toggle-bfield');
+const toggleWaves = document.getElementById('toggle-waves');
+const toggleSquare = document.getElementById('toggle-square');
+const toggleReceiver = document.getElementById('toggle-receiver');
+
+const inputName0 = document.getElementById('input-name-0');
+const inputName1 = document.getElementById('input-name-1');
+const inputNameReceiver = document.getElementById('input-name-receiver');
+const rowName1 = document.getElementById('row-name-1');
+
+// 统一电量同步函数
+function updateChargeA(val) {
+  physics.qA = parseFloat(val);
+  slideChargeA.value = physics.qA;
+  valChargeA.textContent = (physics.qA > 0 ? '+' : '') + physics.qA.toFixed(1);
+  applyChargesToEntities();
+}
+
+function updateChargeB(val) {
+  physics.qB = parseFloat(val);
+  slideChargeB.value = physics.qB;
+  valChargeB.textContent = (physics.qB > 0 ? '+' : '') + physics.qB.toFixed(1);
+  applyChargesToEntities();
+}
+
+slideChargeA.addEventListener('input', (e) => updateChargeA(e.target.value));
+slideChargeB.addEventListener('input', (e) => updateChargeB(e.target.value));
+
+// 闭环尺寸双轨联动
+function updateRectWidth(val) {
+  val = Math.max(50, Math.min(400, parseInt(val) || 50));
+  physics.rectWidth = val;
+  slideRectWidth.value = val;
+  inputRectWidth.value = val;
+  valRectWidth.textContent = `${val} px`;
+}
+function updateRectHeight(val) {
+  val = Math.max(30, Math.min(300, parseInt(val) || 30));
+  physics.rectHeight = val;
+  slideRectHeight.value = val;
+  inputRectHeight.value = val;
+  valRectHeight.textContent = `${val} px`;
+}
+slideRectWidth.addEventListener('input', (e) => updateRectWidth(e.target.value));
+inputRectWidth.addEventListener('input', (e) => updateRectWidth(e.target.value));
+slideRectHeight.addEventListener('input', (e) => updateRectHeight(e.target.value));
+inputRectHeight.addEventListener('input', (e) => updateRectHeight(e.target.value));
+
+// 闭合回路匀速/振荡运动方式切换
+function setLoopMotion(type) {
+  physics.loopMotionType = type;
+  document.getElementById('btn-loop-uniform').classList.remove('active');
+  document.getElementById('btn-loop-oscillate').classList.remove('active');
+  if (type === 'uniform') {
+    document.getElementById('btn-loop-uniform').classList.add('active');
+    document.getElementById('val-loop-motion').textContent = '匀速运动';
+  } else {
+    document.getElementById('btn-loop-oscillate').classList.add('active');
+    document.getElementById('val-loop-motion').textContent = '简谐加速振荡';
+  }
+}
+
+// 名字标签输入侦听
+inputName0.addEventListener('input', (e) => { physics.electronNames[0] = e.target.value; });
+inputName1.addEventListener('input', (e) => { physics.electronNames[1] = e.target.value; });
+inputNameReceiver.addEventListener('input', (e) => { physics.electronNames[2] = e.target.value; });
+
+slideLabelFontSize.addEventListener('input', (e) => {
+  physics.labelFontSize = parseInt(e.target.value);
+  valLabelFontSize.textContent = `${physics.labelFontSize} px`;
+});
+
+slideScopeAmp.addEventListener('input', (e) => {
+  physics.scopeAmp = parseInt(e.target.value) / 100;
+  valScopeAmp.textContent = `${e.target.value}%`;
+});
+
+slideC.addEventListener('input', (e) => {
+  physics.c = parseFloat(e.target.value);
+  valC.textContent = `${physics.c.toFixed(2)} px/f`;
+  document.getElementById('hud-c').textContent = `${physics.c.toFixed(1)} px/f`;
+});
+slideV.addEventListener('input', (e) => {
+  physics.vRatio = parseInt(e.target.value) / 100;
+  valV.textContent = `${e.target.value}%`;
+});
+slideFreq.addEventListener('input', (e) => {
+  physics.omega = parseFloat(e.target.value);
+  valFreq.textContent = `${physics.omega.toFixed(2)} rad/f`;
+});
+slideAmp.addEventListener('input', (e) => {
+  physics.amp = parseInt(e.target.value);
+  valAmp.textContent = `${physics.amp} px`;
+});
+slideSpacing.addEventListener('input', (e) => {
+  physics.wireSpacing = parseInt(e.target.value);
+  valSpacing.textContent = `${physics.wireSpacing} px`;
+  
+  const h = canvas.height / (window.devicePixelRatio || 1);
+  if (physics.mode === 'parallel' && electrons.length === 2) {
+    electrons[0].oy = h * 0.5 - physics.wireSpacing / 2;
+    electrons[1].oy = h * 0.5 + physics.wireSpacing / 2;
+    if (!electrons[0].isDragging) electrons[0].y = electrons[0].oy;
+    if (!electrons[1].isDragging) electrons[1].y = electrons[1].oy;
+  }
+});
+slideCanvasScale.addEventListener('input', (e) => {
+  physics.canvasScale = parseInt(e.target.value);
+  valCanvasScale.textContent = `${physics.canvasScale}%`;
+  resizeCanvas();
+});
+slideLineWidth.addEventListener('input', (e) => {
+  physics.lineWidth = parseFloat(e.target.value);
+  valLineWidth.textContent = `${physics.linewidth.toFixed(1)} px`;
+});
+
+slideBloomEField.addEventListener('input', (e) => {
+  physics.bloomEField = parseInt(e.target.value);
+  valBloomEField.textContent = `${physics.bloomEField} px`;
+});
+slideBloomBField.addEventListener('input', (e) => {
+  physics.bloomBField = parseInt(e.target.value);
+  valBloomBField.textContent = `${physics.bloomBField} px`;
+});
+slideBloomWaves.addEventListener('input', (e) => {
+  physics.bloomWaves = parseInt(e.target.value);
+  valBloomWaves.textContent = `${physics.bloomWaves} px`;
+});
+slideBloomGrid.addEventListener('input', (e) => {
+  physics.bloomGrid = parseInt(e.target.value);
+  valBloomGrid.textContent = `${physics.bloomGrid} px`;
+});
+
+slideFontSize.addEventListener('input', (e) => {
+  physics.fontSize = parseInt(e.target.value);
+  valFontSize.textContent = `${physics.fontSize} px`;
+  
+  document.querySelectorAll('#control-panel span, #control-panel p, #control-panel button, #equation-panel').forEach(el => {
+    el.style.fontSize = `${physics.fontSize}px`;
+  });
+});
+
+toggleGrid.addEventListener('change', (e) => physics.showGrid = e.target.checked);
+toggleEField.addEventListener('change', (e) => physics.showEField = e.target.checked);
+toggleBField.addEventListener('change', (e) => physics.showBField = e.target.checked);
+toggleWaves.addEventListener('change', (e) => physics.showWaves = e.target.checked);
+toggleReceiver.addEventListener('change', (e) => physics.showReceiver = e.target.checked);
+
+toggleSquare.addEventListener('change', (e) => {
+  if (e.target.checked) {
+    canvasContainer.classList.add('square-mode');
+  } else {
+    canvasContainer.classList.remove('square-mode');
+  }
+  resizeCanvas();
+});
+
+// 单电子二级子状态切换
+function setSingleSubMode(subMode) {
+  physics.singleSubMode = subMode;
+  document.getElementById('btn-single-uniform').classList.remove('active');
+  document.getElementById('btn-single-oscillate').classList.remove('active');
+  if (subMode === 'uniform') {
+    document.getElementById('btn-single-uniform').classList.add('active');
+  } else {
+    document.getElementById('btn-single-oscillate').classList.add('active');
+  }
+  setMode('single');
+}
+
+// 静态预设切换
+function setStaticPreset(type) {
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+
+  document.getElementById('btn-preset-dipole').classList.remove('active');
+  document.getElementById('btn-preset-positive').classList.remove('active');
+  document.getElementById('btn-preset-negative').classList.remove('active');
+
+  if (type === 'dipole') {
+    document.getElementById('btn-preset-dipole').classList.add('active');
+    updateChargeA(1.0);
+    updateChargeB(-1.0);
+  } else if (type === 'positive') {
+    document.getElementById('btn-preset-positive').classList.add('active');
+    updateChargeA(1.0);
+    updateChargeB(1.0);
+  } else if (type === 'negative') {
+    document.getElementById('btn-preset-negative').classList.add('active');
+    updateChargeA(-1.0);
+    updateChargeB(-1.0);
+  }
+
+  staticCharges = [
+    { x: w * 0.35, y: h * 0.5, q: physics.qA, isDragging: false, label: physics.qA >= 0 ? '正电荷 A' : '负电荷 A' },
+    { x: w * 0.65, y: h * 0.5, q: physics.qB, isDragging: false, label: physics.qB >= 0 ? '正电荷 B' : '负电荷 B' }
+  ];
+}
+
+// 切换场景控制图层展示与电量适配
+function setMode(mode) {
+  physics.mode = mode;
+  document.querySelectorAll('.btn-group-full > button').forEach(btn => btn.classList.remove('active'));
+  
+  const btnMap = {
+    'single': 'btn-mode-single',
+    'parallel': 'btn-mode-parallel',
+    'antenna': 'btn-mode-antenna',
+    'static': 'btn-mode-static'
+  };
+  
+  if (btnMap[mode]) {
+    document.getElementById(btnMap[mode]).classList.add('active');
+  }
+
+  document.querySelectorAll('.eq-item').forEach(el => el.classList.remove('active-eq'));
+  const hudModeText = document.getElementById('hud-mode');
+  const hudInterference = document.getElementById('hud-interference');
+
+  const rowSpeed = document.getElementById('row-speed');
+  const rowFreq = document.getElementById('row-freq');
+  const rowAmp = document.getElementById('row-amp');
+  const rowSpacing = document.getElementById('row-spacing');
+  const rowC = document.getElementById('row-c-speed');
+  
+  const subSingleControls = document.getElementById('sub-single-controls');
+  const rowStaticPresets = document.getElementById('row-static-presets');
+  const rowRectWidth = document.getElementById('row-rect-width');
+  const rowRectHeight = document.getElementById('row-rect-height');
+  const rowLoopMotion = document.getElementById('row-loop-motion');
+  const sectionLabels = document.getElementById('section-labels');
+  
+  const rowChargeB = document.getElementById('row-charge-b');
+
+  // 初始化重设状态
+  subSingleControls.style.display = 'none';
+  rowStaticPresets.style.display = 'none';
+  rowRectWidth.style.display = 'none';
+  rowRectHeight.style.display = 'none';
+  rowLoopMotion.style.display = 'none';
+  rowSpacing.style.display = 'none';
+  rowSpeed.style.display = 'none';
+  rowFreq.style.display = 'none';
+  rowAmp.style.display = 'none';
+  rowName1.style.display = 'none'; 
+  rowC.style.display = 'block';
+  sectionLabels.style.display = 'block';
+  rowChargeB.style.display = 'block';
+
+  // 根据场景赋以默认物理电量配置
+  if (mode === 'single') {
+    updateChargeA(-1.0); // 默认单电子
+    rowChargeB.style.display = 'none';
+    
+    rowSpeed.style.display = 'block';
+    subSingleControls.style.display = 'flex';
+    rowName1.style.display = 'none'; 
+    if (physics.singleSubMode === 'uniform') {
+      document.getElementById('eq-gauss').classList.add('active-eq');
+      hudModeText.textContent = "单电子-匀速直线";
+      hudInterference.textContent = "无(单静源库仑场)";
+      hudInterference.style.color = "#7f8fa4";
+    } else {
+      rowFreq.style.display = 'block';
+      rowAmp.style.display = 'block';
+      document.getElementById('eq-faraday').classList.add('active-eq');
+      hudModeText.textContent = "单电子-简谐振荡";
+      hudInterference.textContent = "无(单动源无干涉)";
+      hudInterference.style.color = "var(--accent-cyan)";
+    }
+  } 
+  else if (mode === 'parallel') {
+    updateChargeA(-1.0);
+    updateChargeB(-1.0); // 双线电子流
+    
+    rowSpeed.style.display = 'block';
+    rowFreq.style.display = 'block';
+    rowAmp.style.display = 'block';
+    rowSpacing.style.display = 'block';
+    rowName1.style.display = 'block'; 
+    document.getElementById('eq-gauss').classList.add('active-eq');
+    document.getElementById('eq-ampere').classList.add('active-eq');
+    hudModeText.textContent = "双线反向平行";
+    hudInterference.textContent = "强干涉 (中垂线辐射相消)";
+    hudInterference.style.color = "var(--accent-magenta)";
+  }
+  else if (mode === 'antenna') {
+    updateChargeA(-1.0);
+    updateChargeB(-1.0); // 回路中环绕运行的电荷
+    
+    rowSpeed.style.display = 'block';
+    rowFreq.style.display = 'block';
+    rowAmp.style.display = 'block';
+    rowRectWidth.style.display = 'block';
+    rowRectHeight.style.display = 'block';
+    rowLoopMotion.style.display = 'block';
+    rowName1.style.display = 'block'; 
+    document.getElementById('eq-faraday').classList.add('active-eq');
+    document.getElementById('eq-ampere').classList.add('active-eq');
+    hudModeText.textContent = "长方形闭合回路";
+    hudInterference.textContent = "多极辐射 (超低频辐射相消损耗)";
+    hudInterference.style.color = "var(--accent-green)";
+  }
+  else if (mode === 'static') {
+    rowStaticPresets.style.display = 'block';
+    rowC.style.display = 'none';
+    rowName1.style.display = 'block';
+    document.getElementById('eq-gauss').classList.add('active-eq');
+    setStaticPreset('dipole'); // 静电等量异种 +- 极预设
+  }
+  
+  initPhysics();
+  scopeHistory.length = 0; 
+}
+
+// --- 可拖拽悬浮面板系统 ---
+function setupDraggablePanel(panelEl, dragHandle) {
+  let xOffset = 0, yOffset = 0, initialX = 0, initialY = 0;
+  let active = false;
+
+  dragHandle.addEventListener("mousedown", dragStart, false);
+  document.addEventListener("mouseup", dragEnd, false);
+  document.addEventListener("mousemove", drag, false);
+
+  dragHandle.addEventListener("touchstart", dragStart, false);
+  document.addEventListener("touchend", dragEnd, false);
+  document.addEventListener("touchmove", drag, false);
+
+  function dragStart(e) {
+    if (e.target.hasAttribute('contenteditable') || e.target.classList.contains('panel-toggle-btn') || e.target.classList.contains('text-input')) return;
+
+    let clientX, clientY;
+    if (e.type === "touchstart") {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    active = true;
+    initialX = clientX - xOffset;
+    initialY = clientY - yOffset;
+  }
+
+  function dragEnd() {
+    active = false;
+  }
+
+  function drag(e) {
+    if (!active) return;
+    e.preventDefault();
+
+    let clientX, clientY;
+    if (e.type === "touchmove") {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    xOffset = clientX - initialX;
+    yOffset = clientY - initialY;
+
+    panelEl.style.transform = `translate(${xOffset}px, ${yOffset}px)`;
+  }
+}
+
+setupDraggablePanel(document.getElementById('console-panel'), document.getElementById('console-drag-handle'));
+
+function toggleConsole() {
+  const panel = document.getElementById('console-panel');
+  const btn = document.getElementById('console-toggle-btn');
+  panel.classList.toggle('collapsed');
+  if (panel.classList.contains('collapsed')) {
+    btn.textContent = '▢';
+    panel.dataset.prevHeight = panel.style.height || '400px';
+    panel.style.height = '35px';
+  } else {
+    btn.textContent = '_';
+    panel.style.height = panel.dataset.prevHeight || '';
+  }
+}
+
+// --- 鼠标/拖拽交互控制系统 ---
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width / (window.devicePixelRatio || 1);
+  const scaleY = canvas.height / rect.height / (window.devicePixelRatio || 1);
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+
+  if (physics.mode === 'static') {
+    staticCharges.forEach(charge => {
+      let dist = Math.hypot(mx - charge.x, my - charge.y);
+      if (dist < 20) {
+        charge.isDragging = true;
+        activeStaticCharge = charge;
+      }
+    });
+    return;
+  }
+
+  if (physics.mode === 'parallel') {
+    const L = w * 0.4;
+    const my1 = h * 0.5 - physics.wireSpacing / 2;
+    const my2 = h * 0.5 + physics.wireSpacing / 2;
+
+    const rx1 = w * 0.5 + L * Math.cos(physics.bendAngle0);
+    const ry1 = my1 + L * Math.sin(physics.bendAngle0);
+    const rx2 = w * 0.5 + L * Math.cos(physics.bendAngle1);
+    const ry2 = my2 + L * Math.sin(physics.bendAngle1);
+
+    const distToHandle1 = Math.hypot(mx - rx1, my - ry1);
+    const distToHandle2 = Math.hypot(mx - rx2, my - ry2);
+
+    if (distToHandle1 < 20) {
+      physics.activeRotateIdx = 0;
+      return;
+    } else if (distToHandle2 < 20) {
+      physics.activeRotateIdx = 1;
+      return;
+    }
+  }
+
+  if (physics.showReceiver) {
+    const distToReceiver = Math.hypot(mx - receiver.x, my - receiver.y);
+    if (distToReceiver < receiver.radius * 2.5) {
+      receiver.isDragging = true;
+      return;
+    }
+  }
+
+  electrons.forEach((elec, idx) => {
+    const dist = Math.hypot(mx - elec.x, my - elec.y);
+    if (dist < 20) {
+      activeElectron = elec;
+      elec.isDragging = true;
+    }
+  });
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width / (window.devicePixelRatio || 1);
+  const scaleY = canvas.height / rect.height / (window.devicePixelRatio || 1);
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+
+  if (physics.mode === 'static' && activeStaticCharge && activeStaticCharge.isDragging) {
+    activeStaticCharge.x = mx;
+    activeStaticCharge.y = my;
+    return;
+  }
+
+  if (physics.activeRotateIdx !== -1) {
+    const targetYCenter = h * 0.5 + (physics.activeRotateIdx === 0 ? -physics.wireSpacing / 2 : physics.wireSpacing / 2);
+    const calcAngle = Math.atan2(my - targetYCenter, mx - w * 0.5);
+    const stepRad = 5 * Math.PI / 180; // 5 degrees snap
+    const snappedAngle = Math.round(calcAngle / stepRad) * stepRad;
+    if (physics.activeRotateIdx === 0) {
+      physics.bendAngle0 = snappedAngle;
+    } else {
+      physics.bendAngle1 = snappedAngle;
+    }
+    return;
+  }
+
+  if (physics.showReceiver && receiver.isDragging) {
+    receiver.x = mx;
+    receiver.y = my;
+    return;
+  }
+
+  if (activeElectron && activeElectron.isDragging) {
+    if (physics.mode === 'antenna') {
+      const s = getClosestRectPerimeterPos(mx, my, physics.rectWidth, physics.rectHeight, w * 0.5, h * 0.5);
+      const motionVal = (physics.loopMotionType === 'oscillate') ?
+        physics.amp * Math.sin(physics.omega * physics.time) :
+        (physics.c * physics.vRatio) * physics.time;
+
+      const idx = electrons.indexOf(activeElectron);
+      if (idx === 0) {
+        physics.rectS0 = s - motionVal;
+      } else if (idx === 1) {
+        physics.rectS1 = s - motionVal;
+      }
+    } else {
+      activeElectron.x = mx;
+      activeElectron.y = my;
+    }
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  if (activeElectron) {
+    activeElectron.isDragging = false;
+    activeElectron = null;
+  }
+  if (activeStaticCharge) {
+    activeStaticCharge.isDragging = false;
+    activeStaticCharge = null;
+  }
+  receiver.isDragging = false;
+  physics.activeRotateIdx = -1;
+});
+
+// 适配移动触控端
+canvas.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 0) return;
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width / (window.devicePixelRatio || 1);
+  const scaleY = canvas.height / rect.height / (window.devicePixelRatio || 1);
+  const mx = (touch.clientX - rect.left) * scaleX;
+  const my = (touch.clientY - rect.top) * scaleY;
+
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+
+  if (physics.mode === 'static') {
+    staticCharges.forEach(charge => {
+      let dist = Math.hypot(mx - charge.x, my - charge.y);
+      if (dist < 30) {
+        charge.isDragging = true;
+        activeStaticCharge = charge;
+      }
+    });
+    return;
+  }
+
+  if (physics.mode === 'parallel') {
+    const L = w * 0.4;
+    const my1 = h * 0.5 - physics.wireSpacing / 2;
+    const my2 = h * 0.5 + physics.wireSpacing / 2;
+
+    const rx1 = w * 0.5 + L * Math.cos(physics.bendAngle0);
+    const ry1 = my1 + L * Math.sin(physics.bendAngle0);
+    const rx2 = w * 0.5 + L * Math.cos(physics.bendAngle1);
+    const ry2 = my2 + L * Math.sin(physics.bendAngle1);
+
+    if (Math.hypot(mx - rx1, my - ry1) < 30) {
+      physics.activeRotateIdx = 0;
+      return;
+    } else if (Math.hypot(mx - rx2, my - ry2) < 30) {
+      physics.activeRotateIdx = 1;
+      return;
+    }
+  }
+
+  if (physics.showReceiver) {
+    const distToReceiver = Math.hypot(mx - receiver.x, my - receiver.y);
+    if (distToReceiver < receiver.radius * 3) {
+      receiver.isDragging = true;
+      return;
+    }
+  }
+
+  electrons.forEach((elec, idx) => {
+    const dist = Math.hypot(mx - elec.x, my - elec.y);
+    if (dist < 30) {
+      activeElectron = elec;
+      elec.isDragging = true;
+    }
+  });
+}, { passive: true });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 0) return;
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width / (window.devicePixelRatio || 1);
+  const scaleY = canvas.height / rect.height / (window.devicePixelRatio || 1);
+  const mx = (touch.clientX - rect.left) * scaleX;
+  const my = (touch.clientY - rect.top) * scaleY;
+
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+
+  if (physics.mode === 'static' && activeStaticCharge && activeStaticCharge.isDragging) {
+    activeStaticCharge.x = mx;
+    activeStaticCharge.y = my;
+    return;
+  }
+
+  if (physics.activeRotateIdx !== -1) {
+    const targetYCenter = h * 0.5 + (physics.activeRotateIdx === 0 ? -physics.wireSpacing / 2 : physics.wireSpacing / 2);
+    const calcAngle = Math.atan2(my - targetYCenter, mx - w * 0.5);
+    const stepRad = 5 * Math.PI / 180; // 5 degrees snap
+    const snappedAngle = Math.round(calcAngle / stepRad) * stepRad;
+    if (physics.activeRotateIdx === 0) {
+      physics.bendAngle0 = snappedAngle;
+    } else {
+      physics.bendAngle1 = snappedAngle;
+    }
+    return;
+  }
+
+  if (physics.showReceiver && receiver.isDragging) {
+    receiver.x = mx;
+    receiver.y = my;
+    return;
+  }
+
+  if (activeElectron && activeElectron.isDragging) {
+    if (physics.mode === 'antenna') {
+      const s = getClosestRectPerimeterPos(mx, my, physics.rectWidth, physics.rectHeight, w * 0.5, h * 0.5);
+      const motionVal = (physics.loopMotionType === 'oscillate') ?
+        physics.amp * Math.sin(physics.omega * physics.time) :
+        (physics.c * physics.vRatio) * physics.time;
+
+      const idx = electrons.indexOf(activeElectron);
+      if (idx === 0) {
+        physics.rectS0 = s - motionVal;
+      } else if (idx === 1) {
+        physics.rectS1 = s - motionVal;
+      }
+    } else {
+      activeElectron.x = mx;
+      activeElectron.y = my;
+    }
+  }
+}, { passive: true });
+
+canvas.addEventListener('touchend', () => {
+  if (activeElectron) activeElectron.isDragging = false;
+  if (activeStaticCharge) activeStaticCharge.isDragging = false;
+  activeElectron = null;
+  activeStaticCharge = null;
+  receiver.isDragging = false;
+  physics.activeRotateIdx = -1;
+});
+
+// =========================================================================
+// --- 核心物理渲染与动能解析 (严谨的矢量干涉加和实现) ---
+// =========================================================================
+
+/**
+ * 计算空间某点在时刻 t 时，所有运动源产生电场的推迟势矢量和
+ */
+function getTotalInterferenceField(px, py, t) {
+  let totalEx = 0;
+  let totalEy = 0;
+
+  for (let i = 0; i < electrons.length; i++) {
+    const elec = electrons[i];
+    const q = elec.q !== undefined ? elec.q : -1.0; // 绑定实时自定义电荷量
+    const state = elec.getRetardedState(px, py, t);
+    const dx = px - state.x;
+    const dy = py - state.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist > 5) {
+      const nx = dx / dist;
+      const ny = dy / dist;
+
+      // 辐射场分量 E_rad ∝ -q * a_perp / r
+      const projA = state.ax * nx + state.ay * ny;
+      const perpAx = state.ax - projA * nx;
+      const perpAy = state.ay - projA * ny;
+
+      // 矢量方向与电荷极性 q 正负直接正相关
+      const radContribX = q * perpAx / (dist * 0.015 + 1);
+      const radContribY = q * perpAy / (dist * 0.015 + 1);
+
+      totalEx -= radContribX;
+      totalEy -= radContribY;
+    }
+  }
+
+  return {
+    E_rad_mag: Math.hypot(totalEx, totalEy),
+    E_rad_x: totalEx,
+    E_rad_y: totalEy
+  };
+}
+
+// 1. 三维透视几何网格渲染
+function drawWarpedGrid(w, h) {
+  if (!physics.showGrid) return;
+  ctx.save();
+  
+  const gridSpacing = 40;
+  const perspectiveOffset = 0.15; 
+
+  const gridOpacity = 0.05 * (physics.bloomGrid / 15);
+  ctx.strokeStyle = `rgba(0, 242, 254, ${gridOpacity})`;
+  ctx.lineWidth = 1;
+
+  const rows = Math.floor(h / gridSpacing) + 2;
+  const cols = Math.floor(w / gridSpacing) + 2;
+
+  // 画横线
+  for (let r = 0; r < rows; r++) {
+    ctx.beginPath();
+    const gy = r * gridSpacing;
+    for (let c = 0; c < cols; c++) {
+      const gx = c * gridSpacing;
+      let warpX = gx;
+      let warpY = gy;
+
+      let activeSource = (physics.mode === 'static') ? staticCharges : electrons;
+
+      activeSource.forEach(elec => {
+        const dx = gx - elec.x;
+        const dy = gy - elec.y;
+        const dist = Math.hypot(dx, dy) + 40;
+        
+        let staticWarp = 0;
+        let accelWarp = 0;
+        const q = elec.q !== undefined ? elec.q : -1.0;
+
+        if (physics.mode === 'static') {
+          // 静电场下网格弯曲方向受极性 q 决定（正负相反扭曲）
+          staticWarp = (q * 5000) / (dist * 1.1);
+        } else {
+          const state = elec.getRetardedState(gx, gy, physics.time);
+          const retardDist = Math.hypot(gx - state.x, gy - state.y) + 40;
+          staticWarp = (q * 6000) / (dist * 1.1); 
+          // 动态电磁波畸变，正负电荷产生相位相反的动力学扰动
+          accelWarp = q * 180 * Math.sin(physics.time * 0.15 - retardDist / (physics.c * 1.2)) * (Math.hypot(state.ax, state.ay) / (physics.c + 1.5));
+        }
+        
+        warpY += (staticWarp + accelWarp) * (dy / dist) * 0.12;
+        warpX += (staticWarp + accelWarp) * (dx / dist) * 0.12;
+      });
+
+      const pScale = 1 + (warpY - h/2) * perspectiveOffset / h;
+      const renderX = h/2 + (warpX - h/2) * pScale;
+
+      if (c === 0) ctx.moveTo(renderX, warpY);
+      else ctx.lineTo(renderX, warpY);
+    }
+    ctx.stroke();
+  }
+
+  // 画竖线
+  for (let c = 0; c < cols; c++) {
+    ctx.beginPath();
+    const gx = c * gridSpacing;
+    for (let r = 0; r < rows; r++) {
+      const gy = r * gridSpacing;
+      let warpX = gx;
+      let warpY = gy;
+
+      let activeSource = (physics.mode === 'static') ? staticCharges : electrons;
+
+      activeSource.forEach(elec => {
+        const dx = gx - elec.x;
+        const dy = gy - elec.y;
+        const dist = Math.hypot(dx, dy) + 40;
+
+        let staticWarp = 0;
+        let accelWarp = 0;
+        const q = elec.q !== undefined ? elec.q : -1.0;
+
+        if (physics.mode === 'static') {
+          staticWarp = (q * 5000) / (dist * 1.1);
+        } else {
+          const state = elec.getRetardedState(gx, gy, physics.time);
+          const retardDist = Math.hypot(gx - state.x, gy - state.y) + 40;
+          staticWarp = (q * 6000) / (dist * 1.1);
+          accelWarp = q * 180 * Math.sin(physics.time * 0.15 - retardDist / (physics.c * 1.2)) * (Math.hypot(state.ax, state.ay) / (physics.c + 1.5));
+        }
+
+        warpY += (staticWarp + accelWarp) * (dy / dist) * 0.12;
+        warpX += (staticWarp + accelWarp) * (dx / dist) * 0.12;
+      });
+
+      const pScale = 1 + (warpY - h/2) * perspectiveOffset / h;
+      const renderX = h/2 + (warpX - h/2) * pScale;
+
+      if (r === 0) ctx.moveTo(renderX, warpY);
+      else ctx.lineTo(renderX, warpY);
+    }
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// 2. 绘制电线结构
+function drawPhysicalWires(w, h) {
+  if (physics.mode !== 'parallel' && physics.mode !== 'antenna') return;
+
+  ctx.save();
+  ctx.lineWidth = physics.lineWidth * 2.5; 
+  ctx.shadowBlur = physics.bloomEField;    
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.shadowColor = 'rgba(0, 242, 254, 0.5)';
+
+  if (physics.mode === 'parallel') {
+    const L = w * 0.4; 
+    const my1 = h * 0.5 - physics.wireSpacing / 2;
+    const my2 = h * 0.5 + physics.wireSpacing / 2;
+
+    ctx.beginPath();
+    ctx.moveTo(w * 0.1, my1);
+    ctx.lineTo(w * 0.5, my1);
+    ctx.lineTo(w * 0.5 + L * Math.cos(physics.bendAngle0), my1 + L * Math.sin(physics.bendAngle0));
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(w * 0.1, my2);
+    ctx.lineTo(w * 0.5, my2);
+    ctx.lineTo(w * 0.5 + L * Math.cos(physics.bendAngle1), my2 + L * Math.sin(physics.bendAngle1));
+    ctx.stroke();
+
+    ctx.fillStyle = '#00f2fe';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(w * 0.5, my1, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(w * 0.5, my2, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffaa00';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(w * 0.5 + L * Math.cos(physics.bendAngle0), my1 + L * Math.sin(physics.bendAngle0), 6, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(w * 0.5 + L * Math.cos(physics.bendAngle1), my2 + L * Math.sin(physics.bendAngle1), 6, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#d1d9e6';
+    ctx.font = `bold 10px monospace`;
+    ctx.fillText(`${(physics.bendAngle0 * 180 / Math.PI).toFixed(1)}°`, w * 0.5 + 10, my1 - 10);
+    ctx.fillText(`${(physics.bendAngle1 * 180 / Math.PI).toFixed(1)}°`, w * 0.5 + 10, my2 + 18);
+    ctx.restore();
+  } 
+  else if (physics.mode === 'antenna') {
+    const W = physics.rectWidth;
+    const H = physics.rectHeight;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    ctx.strokeStyle = 'rgba(0, 242, 254, 0.45)';
+    ctx.shadowBlur = physics.bloomEField;
+    ctx.shadowColor = 'rgba(0, 242, 254, 0.6)';
+    ctx.beginPath();
+    ctx.rect(cx - W / 2, cy - H / 2, W, H);
+    ctx.stroke();
+
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.font = '10px monospace';
+    ctx.fillText(`W: ${Math.round(W)}px, H: ${Math.round(H)}px`, cx - W / 2, cy + H / 2 + 18);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// 3. 基于总干涉矢量场的电场发光线渲染（极性动态统一色系）
+function drawEFieldLines(elec) {
+  if (!physics.showEField) return;
+
+  const numLines = 24;      
+  const maxDist = Math.max(canvas.width, canvas.height);
+  const step = 8;           
+  const numSteps = Math.floor(maxDist / step);
+  const q = elec.q !== undefined ? elec.q : -1.0;
+
+  ctx.save();
+  ctx.lineWidth = physics.lineWidth;
+  ctx.shadowBlur = 0; 
+
+  for (let i = 0; i < numLines; i++) {
+    const baseAngle = (i * Math.PI * 2) / numLines;
+    
+    let lastPx = null;
+    let lastPy = null;
+    
+    for (let s = 0; s < numSteps; s++) {
+      const currentRadius = s * step;
+      const lookbackTime = physics.time - currentRadius / physics.c;
+      
+      let histX = elec.x, histY = elec.y;
+      let histAx = elec.ax, histAy = elec.ay;
+
+      if (elec.history.length > 0) {
+        let found = false;
+        for (let h = 0; h < elec.history.length; h++) {
+          if (elec.history[h].t <= lookbackTime) {
+            histX = elec.history[h].x;
+            histY = elec.history[h].y;
+            histAx = elec.history[h].ax;
+            histAy = elec.history[h].ay;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          const oldest = elec.history[elec.history.length - 1];
+          histX = oldest.x; histY = oldest.y;
+          histAx = oldest.ax; histAy = oldest.ay;
+        }
+      }
+
+      let px = histX + currentRadius * Math.cos(baseAngle);
+      let py = histY + currentRadius * Math.sin(baseAngle);
+
+      const radDirectionX = Math.cos(baseAngle);
+      const radDirectionY = Math.sin(baseAngle);
+      
+      const projA = histAx * radDirectionX + histAy * radDirectionY;
+      const perpAx = histAx - projA * radDirectionX;
+      const perpAy = histAy - projA * radDirectionY;
+
+      const distortionFactor = currentRadius / (physics.c * physics.c * 1.5);
+      px -= perpAx * distortionFactor * 12;
+      py -= perpAy * distortionFactor * 12;
+
+      if (s > 0) {
+        ctx.beginPath();
+        ctx.moveTo(lastPx, lastPy);
+        ctx.lineTo(px, py);
+
+        // 获取该点的干涉总场进行着色
+        const totalField = getTotalInterferenceField(px, py, physics.time);
+        const effectiveAccel = totalField.E_rad_mag * (currentRadius * 0.015 + 1);
+        
+        const coulombTerm = Math.pow(45 / (currentRadius + 45), 2);
+        const radiationTerm = effectiveAccel > 0.01 ? (effectiveAccel * 160) / (currentRadius + 80) : 0;
+        const totalFieldIntensity = coulombTerm + radiationTerm;
+
+        const bloomScaleE = physics.bloomEField / 15;
+        const bloomScaleW = physics.bloomWaves / 15;
+        
+        const maxAlpha = (effectiveAccel > 0.05 && physics.showWaves ? 0.65 * bloomScaleW : 0.45 * bloomScaleE);
+        const alpha = Math.min(maxAlpha, totalFieldIntensity * maxAlpha);
+
+        if (alpha > 0.01) {
+          if (effectiveAccel > 0.05 && physics.showWaves) {
+            ctx.strokeStyle = `rgba(255, 0, 127, ${alpha})`; // 辐射高频波澜统一为品红
+          } else {
+            // 根据产生它的电荷极性着色 (正电荷品红，负电荷青色)
+            ctx.strokeStyle = q >= 0 ? `rgba(255, 0, 127, ${alpha})` : `rgba(0, 242, 254, ${alpha})`;
+          }
+          ctx.stroke();
+        }
+      }
+
+      lastPx = px;
+      lastPy = py;
+    }
+  }
+  ctx.restore();
+}
+
+// 4. 静态电荷流体电力线追踪渲染（完全统一色系）
+function getStaticFieldAt(x, y) {
+  let Ex = 0;
+  let Ey = 0;
+  for (let charge of staticCharges) {
+    let dx = x - charge.x;
+    let dy = y - charge.y;
+    let distSq = dx * dx + dy * dy;
+    let dist = Math.sqrt(distSq);
+    if (dist < 5) continue; 
+    let f = charge.q / (distSq * dist);
+    Ex += dx * f;
+    Ey += dy * f;
+  }
+  return { x: Ex, y: Ey };
+}
+
+function traceFieldLine(startX, startY, direction, steps = 180, stepSize = 5) {
+  let points = [{ x: startX, y: startY }];
+  let cx = startX;
+  let cy = startY;
+  
+  for (let s = 0; s < steps; s++) {
+    let E = getStaticFieldAt(cx, cy);
+    let Emag = Math.hypot(E.x, E.y);
+    if (Emag < 1e-4) break;
+    
+    let dx = (E.x / Emag) * stepSize * direction;
+    let dy = (E.y / Emag) * stepSize * direction;
+    
+    cx += dx; cy += dy;
+    points.push({ x: cx, y: cy });
+    
+    let hitCharge = false;
+    for (let charge of staticCharges) {
+      if (Math.hypot(cx - charge.x, cy - charge.y) < 12) { hitCharge = true; break; }
+    }
+    if (hitCharge) break;
+    if (cx < -50 || cx > canvas.width + 50 || cy < -50 || cy > canvas.height + 50) break;
+  }
+  return points;
+}
+
+function drawStaticFieldLines() {
+  if (physics.mode !== 'static' || !physics.showEField) return;
+  
+  ctx.save();
+  ctx.lineWidth = physics.lineWidth;
+  ctx.shadowBlur = 0;
+
+  staticCharges.forEach(charge => {
+    let numLines = Math.round(18 * Math.abs(charge.q));
+    if (numLines === 0) return;
+    
+    let rStart = 14; 
+    for (let i = 0; i < numLines; i++) {
+      let angle = (i * Math.PI * 2) / numLines;
+      let startX = charge.x + rStart * Math.cos(angle);
+      let startY = charge.y + rStart * Math.sin(angle);
+      
+      let direction = charge.q > 0 ? 1 : -1;
+      let points = traceFieldLine(startX, startY, direction);
+      
+      if (points.length < 2) continue;
+      
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let p = 1; p < points.length; p++) ctx.lineTo(points[p].x, points[p].y);
+      
+      let alpha = 0.45 * (physics.bloomEField / 15);
+      // 正电荷品红，负电荷青色（完全同步）
+      ctx.strokeStyle = charge.q >= 0 ? `rgba(255, 0, 127, ${alpha})` : `rgba(0, 242, 254, ${alpha})`;
+      ctx.stroke();
+
+      // 电流流动粒子模拟
+      let flowSpeed = 1.5;
+      let dotSpacing = 80;
+      // 正电荷朝外流，负电荷朝里（汇聚）流，通过反转时间模来巧妙逆转流向
+      let offset = charge.q >= 0 ? 
+        (physics.time * flowSpeed) % dotSpacing : 
+        (dotSpacing - (physics.time * flowSpeed) % dotSpacing) % dotSpacing;
+      let accumulatedDist = 0;
+
+      for (let p = 1; p < points.length; p++) {
+        let dx = points[p].x - points[p-1].x;
+        let dy = points[p].y - points[p-1].y;
+        let segLen = Math.hypot(dx, dy);
+        
+        accumulatedDist += segLen;
+        if (accumulatedDist > offset) {
+          let ratio = 1 - (accumulatedDist - offset) / segLen;
+          if (ratio >= 0 && ratio <= 1) {
+            let dotX = points[p-1].x + dx * ratio;
+            let dotY = points[p-1].y + dy * ratio;
+            
+            // 流动小球颜色高度统一
+            ctx.fillStyle = charge.q >= 0 ? '#ff007f' : '#00f2fe';
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = ctx.fillStyle;
+            ctx.beginPath();
+            ctx.arc(dotX, dotY, 2.0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          }
+          offset += dotSpacing;
+        }
+      }
+    }
+  });
+  ctx.restore();
+}
+
+// 统一绘制静态电荷的外观形态
+function drawStaticCharges() {
+  if (physics.mode !== 'static') return;
+  
+  staticCharges.forEach((charge, idx) => {
+    const q = charge.q;
+    ctx.save();
+    ctx.shadowBlur = physics.bloomEField * 1.2;
+    // 阴影发光颜色
+    ctx.shadowColor = q >= 0 ? 'rgba(255, 0, 127, 0.8)' : 'rgba(0, 242, 254, 0.8)';
+    ctx.fillStyle = q >= 0 ? '#ff007f' : '#00f2fe';
+    
+    ctx.beginPath();
+    ctx.arc(charge.x, charge.y, 12, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    if (q >= 0) {
+      // 绘制 "+" 符号
+      ctx.moveTo(charge.x - 5, charge.y); ctx.lineTo(charge.x + 5, charge.y);
+      ctx.moveTo(charge.x, charge.y - 5); ctx.lineTo(charge.x, charge.y + 5);
+    } else {
+      // 绘制 "-" 符号
+      ctx.moveTo(charge.x - 5, charge.y); ctx.lineTo(charge.x + 5, charge.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+    
+    ctx.save();
+    ctx.fillStyle = q >= 0 ? '#ff007f' : '#00f2fe';
+    ctx.font = `bold ${physics.labelFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+    ctx.textAlign = 'center';
+    const labelText = physics.electronNames[idx] || (q >= 0 ? '正电荷 A' : '负电荷 A');
+    ctx.fillText(`${labelText} (${q >= 0 ? '+' : ''}${q.toFixed(1)})`, charge.x, charge.y - 18);
+    ctx.restore();
+  });
+}
+
+// 5. 基于干涉总场的磁感同心圈虚线 (B-Field)
+function drawBFieldLines(elec) {
+  if (!physics.showBField || physics.mode === 'static') return;
+
+  const numRings = 5;
+  const speed = Math.hypot(elec.vx, elec.vy);
+  if (speed < 0.1) return; 
+
+  const q = elec.q !== undefined ? elec.q : -1.0;
+
+  ctx.save();
+  ctx.setLineDash([3, 6]); 
+
+  for (let j = 1; j <= numRings; j++) {
+    const baseR = j * 40;
+    ctx.beginPath();
+    
+    for (let ang = 0; ang <= Math.PI * 2 + 0.05; ang += 0.05) {
+      const nrx = Math.cos(ang);
+      const nry = Math.sin(ang);
+      
+      const state = elec.getRetardedState(elec.x + baseR * nrx, elec.y + baseR * nry, physics.time);
+
+      const projA = state.ax * nrx + state.ay * nry;
+      const perpAx = state.ax - projA * nrx;
+      const perpAy = state.ay - projA * nry;
+
+      const warpFactor = baseR / (physics.c * physics.c * 1.8);
+      
+      const px = state.x + baseR * nrx - perpAx * warpFactor * 10;
+      const py = state.y + baseR * nry - perpAy * warpFactor * 10;
+
+      if (ang === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+
+    const totalField = getTotalInterferenceField(elec.x + baseR, elec.y, physics.time);
+    const effectiveAccel = totalField.E_rad_mag * (baseR * 0.015 + 1);
+
+    // 磁场强度受绝对电荷量 q 比例调配
+    const bStatic = (Math.abs(q) * speed / (physics.c * 0.9)) * Math.pow(50 / (baseR + 50), 2);
+    const bRad = physics.showWaves ? (effectiveAccel * 4.0) * (80 / (baseR + 80)) : 0;
+    
+    const totalB = bStatic + bRad;
+    const scaleFactor = physics.bloomBField / 15;
+    
+    const alpha = Math.min(0.85 * scaleFactor, totalB * 0.65 * scaleFactor); 
+
+    if (alpha > 0.01) {
+      ctx.strokeStyle = `rgba(255, 170, 0, ${alpha})`; // 磁感线发光橙黄
+      ctx.lineWidth = physics.lineWidth * 1.1;
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// 6. 辐射加速波前辐射圆
+function drawRadiationWavefronts(elec) {
+  if (!physics.showWaves || elec.history.length === 0 || physics.mode === 'static') return;
+
+  ctx.save();
+  const stepInterval = 12; 
+  const scaleFactor = physics.bloomWaves / 15;
+  const maxRange = Math.max(canvas.width, canvas.height);
+  
+  for (let i = 0; i < elec.history.length; i += stepInterval) {
+    const state = elec.history[i];
+    const sourceAccelMag = Math.hypot(state.ax, state.ay);
+
+    if (sourceAccelMag > 0.015 && sourceAccelMag < 5.0) {
+      const radius = physics.c * (physics.time - state.t);
+      
+      if (radius > 5 && radius < maxRange) {
+         const segments = Math.max(24, Math.floor(radius * Math.PI / 15)); 
+         const angStep = Math.PI * 2 / segments;
+         
+         ctx.lineWidth = physics.lineWidth * 1.8;
+         
+         for (let s = 0; s < segments; s++) {
+            const ang1 = s * angStep;
+            const ang2 = (s + 1) * angStep;
+            
+            const px1 = state.x + radius * Math.cos(ang1);
+            const py1 = state.y + radius * Math.sin(ang1);
+            const px2 = state.x + radius * Math.cos(ang2);
+            const py2 = state.y + radius * Math.sin(ang2);
+            
+            const midX = (px1 + px2) / 2;
+            const midY = (py1 + py2) / 2;
+            
+            const totalField = getTotalInterferenceField(midX, midY, physics.time);
+            const effectiveAccel = totalField.E_rad_mag * (radius * 0.015 + 1);
+            
+            const alpha = Math.max(0, 0.7 * (1 - radius / maxRange) * (effectiveAccel / (physics.c * 0.35))) * scaleFactor;
+            
+            if (alpha > 0.01) {
+              ctx.beginPath();
+              ctx.moveTo(px1, py1);
+              ctx.lineTo(px2, py2);
+              ctx.strokeStyle = `rgba(255, 0, 127, ${alpha})`; // 交变辐射波前统一为品红
+              ctx.stroke();
+            }
+         }
+      }
+    }
+  }
+  ctx.restore();
+}
+
+// 7. 计算接收电子处的严格矢量总场辐射
+function calculateReceiverRadiation() {
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+  
+  const distToCenter = Math.hypot(receiver.x - w * 0.5, receiver.y - h * 0.5);
+  document.getElementById('hud-dist').textContent = `${Math.round(distToCenter)} px`;
+
+  if (physics.mode !== 'static') {
+    // 获取该点严格干涉总场
+    const totalField = getTotalInterferenceField(receiver.x, receiver.y, physics.time);
+
+    const Ey = totalField.E_rad_y;
+    const Ex = totalField.E_rad_x;
+    const projectedSignal = Math.abs(Ey) > Math.abs(Ex) ? Ey : Ex;
+
+    receiver.measuredE = totalField.E_rad_mag;
+    receiver.rawSignedE = projectedSignal; 
+
+    document.getElementById('hud-rx').textContent = `X:${Math.round(receiver.x)}, Y:${Math.round(receiver.y)}`;
+    document.getElementById('hud-rad').textContent = (receiver.measuredE * 100).toFixed(2) + " μV/m";
+  } else {
+    receiver.measuredE = 0;
+    receiver.rawSignedE = 0;
+    document.getElementById('hud-rx').textContent = "无探测需求";
+    document.getElementById('hud-rad').textContent = "0.00 μV/m";
+  }
+}
+
+// --- 实时滚动示波器绘制 ---
+function updateAndDrawOscilloscope() {
+  const rect = scopeCanvas.parentElement.getBoundingClientRect();
+  const targetW = Math.floor(rect.width);
+  const targetH = Math.floor(rect.height);
+  
+  if (targetH < 10) return;
+
+  if (scopeCanvas.width !== targetW || scopeCanvas.height !== targetH) {
+    scopeCanvas.width = targetW;
+    scopeCanvas.height = targetH;
+  }
+
+  const sw = scopeCanvas.width;
+  const sh = scopeCanvas.height;
+
+  if (physics.mode === 'static') {
+    scopeHistory.push(0); 
+  } else {
+    scopeHistory.push(receiver.rawSignedE);
+  }
+
+  if (scopeHistory.length > maxScopePoints) {
+    scopeHistory.shift();
+  }
+
+  sCtx.fillStyle = '#020204';
+  sCtx.fillRect(0, 0, sw, sh);
+
+  sCtx.strokeStyle = 'rgba(0, 242, 254, 0.04)';
+  sCtx.lineWidth = 1;
+  
+  for (let x = 0; x < sw; x += 25) {
+    sCtx.beginPath(); sCtx.moveTo(x, 0); sCtx.lineTo(x, sh); sCtx.stroke();
+  }
+  for (let y = 0; y < sh; y += 25) {
+    sCtx.beginPath(); sCtx.moveTo(0, y); sCtx.lineTo(sw, y); sCtx.stroke();
+  }
+
+  sCtx.strokeStyle = 'rgba(255, 0, 127, 0.12)';
+  sCtx.beginPath();
+  sCtx.moveTo(0, sh / 2);
+  sCtx.lineTo(sw, sh / 2);
+  sCtx.stroke();
+
+  if (scopeHistory.length > 1) {
+    sCtx.save();
+    sCtx.beginPath();
+    sCtx.lineWidth = 2;
+    
+    sCtx.strokeStyle = '#39ff14';
+    sCtx.shadowBlur = physics.bloomWaves * 0.7;
+    sCtx.shadowColor = 'rgba(57, 255, 20, 0.8)';
+
+    const stepX = sw / (maxScopePoints - 1);
+    const startX = sw - (scopeHistory.length - 1) * stepX;
+
+    for (let k = 0; k < scopeHistory.length; k++) {
+      const val = scopeHistory[k];
+      const scaleY = sh * 0.08 * physics.scopeAmp; 
+      const y = sh / 2 - val * scaleY;
+      const x = startX + k * stepX;
+
+      if (k === 0) sCtx.moveTo(x, y);
+      else sCtx.lineTo(x, y);
+    }
+    sCtx.stroke();
+    sCtx.restore();
+  }
+}
+
+// --- 主渲染动力学循环 ---
+function animate() {
+  ctx.fillStyle = 'rgba(3, 3, 5, 0.45)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+
+  physics.time += 1.0;
+
+  drawWarpedGrid(w, h);
+  drawPhysicalWires(w, h);
+
+  if (physics.mode !== 'static') {
+    electrons.forEach((elec, idx) => {
+      elec.update(physics.time, physics.mode, idx);
+      drawEFieldLines(elec);
+      drawBFieldLines(elec);
+      drawRadiationWavefronts(elec);
+    });
+  } else {
+    drawStaticFieldLines();
+  }
+
+  // 绘制动态场源电荷及标签
+  if (physics.mode !== 'static') {
+    electrons.forEach((elec, idx) => {
+      const q = elec.q !== undefined ? elec.q : -1.0;
+      ctx.save();
+      ctx.shadowBlur = physics.bloomEField; 
+      // 动态场源极性色彩统一绑定
+      ctx.shadowColor = q >= 0 ? 'rgba(255, 0, 127, 0.8)' : 'rgba(0, 242, 254, 0.8)';
+      ctx.fillStyle = q >= 0 ? '#ff007f' : '#00f2fe';
+      ctx.beginPath();
+      ctx.arc(elec.x, elec.y, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (q >= 0) {
+        ctx.moveTo(elec.x - 4, elec.y); ctx.lineTo(elec.x + 4, elec.y);
+        ctx.moveTo(elec.x, elec.y - 4); ctx.lineTo(elec.x, elec.y + 4);
+      } else {
+        ctx.moveTo(elec.x - 4, elec.y); ctx.lineTo(elec.x + 4, elec.y);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = q >= 0 ? '#ff007f' : '#00f2fe';
+      ctx.font = `bold ${physics.labelFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+      ctx.textAlign = 'center';
+      const nameText = physics.electronNames[idx] || `电荷 ${idx + 1}`;
+      ctx.fillText(`${nameText} (${q >= 0 ? '+' : ''}${q.toFixed(1)})`, elec.x, elec.y - 15);
+      ctx.restore();
+    });
+  } else {
+    drawStaticCharges();
+  }
+
+  calculateReceiverRadiation();
+
+  // 渲染接收探测电子
+  if (physics.showReceiver && physics.mode !== 'static') {
+    ctx.save();
+    ctx.shadowBlur = physics.bloomWaves * 1.2; 
+    ctx.shadowColor = 'rgba(57, 255, 20, 0.8)';
+    ctx.fillStyle = '#39ff14'; // 探测子保持鲜艳绿色
+    
+    ctx.beginPath();
+    ctx.arc(receiver.x, receiver.y, receiver.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(receiver.x - 4, receiver.y);
+    ctx.lineTo(receiver.x + 4, receiver.y);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = '#39ff14';
+    ctx.font = `bold ${physics.labelFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+    ctx.textAlign = 'center';
+    const receiverNameText = physics.electronNames[2] || "探测器 C";
+    ctx.fillText(receiverNameText, receiver.x, receiver.y - 16);
+    ctx.restore();
+  }
+
+  updateAndDrawOscilloscope();
+  requestAnimationFrame(animate);
+}
+
+// --- 初始化引导 ---
+window.onload = function() {
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  setMode('single');
+  animate();
+};
+
+</script>
+</body>
+</html>

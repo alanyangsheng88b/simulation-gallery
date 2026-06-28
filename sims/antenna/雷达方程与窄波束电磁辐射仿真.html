@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDA仿真: 雷达距离方程与窄波束辐射</title>
+    <style>
+        /* 硬核 EDA 软件风格 CSS */
+        :root {
+            --bg-color: #000000;
+            --grid-color: rgba(0, 255, 100, 0.15);
+            --text-main: #00ff66;
+            --text-alert: #ff3333;
+            --text-cyan: #00ffff;
+            --panel-bg: rgba(10, 20, 15, 0.85);
+            --border-color: #004422;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #app-container {
+            display: flex;
+            gap: 20px;
+            background: #000;
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 100, 0.1);
+        }
+
+        /* 4:3 比例画布容器 */
+        .canvas-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-color: #000;
+            border: 1px solid var(--border-color);
+            box-shadow: inset 0 0 40px rgba(0, 255, 100, 0.05);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* 控制面板 */
+        .control-panel {
+            width: 320px;
+            height: 600px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 0 0 8px var(--text-main);
+            border-bottom: 1px dashed var(--text-main);
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .val-display {
+            color: var(--text-cyan);
+            text-shadow: 0 0 5px var(--text-cyan);
+        }
+
+        /* 极客风滑动条 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 8px;
+            background: var(--text-main);
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--text-main);
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--border-color);
+        }
+
+        /* 仪表盘数据显示区 */
+        .dashboard {
+            margin-top: auto;
+            border: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            font-size: 0.85rem;
+        }
+        
+        .dashboard p {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .highlight-calc {
+            color: var(--text-cyan);
+            font-weight: bold;
+            font-size: 1.1rem;
+            text-shadow: 0 0 8px var(--text-cyan);
+        }
+
+        .btn-trigger {
+            margin-top: 15px;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid var(--text-main);
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn-trigger:hover {
+            background: var(--text-main);
+            color: #000;
+            box-shadow: 0 0 15px var(--text-main);
+        }
+
+        .formula-box {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border-color);
+            word-break: break-all;
+        }
+        .formula-box span.hi { color: var(--text-main); }
+        .formula-box span.hi-red { color: var(--text-alert); }
+
+        /* CRT 扫描线扫描特效叠加 */
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div class="canvas-container">
+        <canvas id="simCanvas" width="800" height="600"></canvas>
+        <div class="scanline"></div>
+    </div>
+    
+    <div class="control-panel">
+        <div class="panel-title">SYS.RADAR_CONTROL</div>
+        
+        <div class="control-group">
+            <label>发射功率 Pt (kW) <span class="val-display" id="valPt">1000</span></label>
+            <input type="range" id="inputPt" min="100" max="5000" step="100" value="1000">
+        </div>
+        
+        <div class="control-group">
+            <label>天线增益 G (dB) <span class="val-display" id="valG">35</span></label>
+            <input type="range" id="inputG" min="20" max="55" step="1" value="35">
+        </div>
+        
+        <div class="control-group">
+            <label>载波频率 f (GHz) <span class="val-display" id="valF">10.0</span></label>
+            <input type="range" id="inputF" min="1" max="20" step="0.5" value="10.0">
+        </div>
+
+        <div class="control-group">
+            <label>目标截面积 σ (m²) <span class="val-display" id="valSigma">5.0</span></label>
+            <input type="range" id="inputSigma" min="0.1" max="20" step="0.1" value="5.0">
+        </div>
+
+        <button class="btn-trigger" id="btnPulse">发射探测脉冲 (TX)</button>
+
+        <div class="dashboard">
+            <p>波长 λ: <span id="outLambda">0.030 m</span></p>
+            <p>估计波束宽度 θ: <span id="outBeam">2.5°</span></p>
+            <p>目标实际距离: <span id="outTargetDist">180.0 km</span></p>
+            <hr style="border-color:var(--border-color)">
+            <p>理论最大探测距离 R_max:</p>
+            <p class="highlight-calc" id="outRmax">214.5 km</p>
+            <p style="color:var(--text-alert); display:none; justify-content:center; margin-top:10px" id="alertMiss">
+                [ 目标超出探测范围 ]
+            </p>
+        </div>
+
+        <div class="formula-box">
+            [EVIDENCE/AUDIT LOG]<br>
+            R_max = ( (<span class="hi">Pt</span>*<span class="hi-red">G</span>²*<span class="hi">λ</span>²*<span class="hi">σ</span>) / (k*T*Bn*Fn*SNR*(4π)³) )^0.25<br>
+            * k=1.38e-23, T=290K, Bn=1MHz, Fn=2(3dB), SNR=10
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 严谨工程师逻辑：电磁波与雷达方程物理引擎
+ * 采用 SI 国际单位制进行底层计算，UI 层映射至绘图像素。
+ */
+
+// --- 物理常数与系统参数预设 ---
+const CONSTANTS = {
+    c: 299792458,           // 光速 (m/s)
+    k: 1.380649e-23,        // 玻尔兹曼常数 (J/K)
+    T: 290,                 // 接收机噪声温度 (K)
+    Bn: 1e6,                // 接收机噪声带宽 (Hz) - 假设 1MHz
+    Fn: 2.0,                // 噪声系数 (线性, 约 3dB)
+    SNR_min: 10.0,          // 最小可检测信噪比 (线性, 10dB)
+    Loss: 1.0               // 系统损耗 (理想状态)
+};
+
+// --- 画布与比例尺映射 ---
+// 将 800px 画布宽度映射为 300km (300,000m) 的物理空间
+const SCALE = {
+    pxToMeter: 300000 / 800,
+    meterToPx: 800 / 300000
+};
+
+// --- 状态与物理量 ---
+let state = {
+    Pt: 1000 * 1000,        // 发射功率 (W)
+    G_dB: 35,               // 增益 (dB)
+    G_lin: Math.pow(10, 35/10), // 增益 (线性)
+    f: 10 * 1e9,            // 频率 (Hz)
+    lambda: CONSTANTS.c / (10 * 1e9), // 波长 (m)
+    sigma: 5.0,             // 目标雷达截面积 (m^2)
+    Rmax: 0,                // 最大探测距离 (m)
+    beamAngle: 0,           // 估算波束宽度 (弧度)
+    
+    // 动画状态
+    pulses: [],             // 当前传播的波阵面
+    targetDetected: false   // 是否已锁定
+};
+
+// 目标位置 (像素坐标)，雷达位于 (50, 500)
+const RADAR_POS = { x: 50, y: 500 };
+const TARGET_POS = { x: 650, y: 150 };
+// 预先计算目标的物理距离 (m)
+const TARGET_DIST_PX = Math.sqrt(Math.pow(TARGET_POS.x - RADAR_POS.x, 2) + Math.pow(TARGET_POS.y - RADAR_POS.y, 2));
+const TARGET_DIST_METER = TARGET_DIST_PX * SCALE.pxToMeter;
+// 目标相对于雷达的夹角
+const TARGET_ANGLE = Math.atan2(TARGET_POS.y - RADAR_POS.y, TARGET_POS.x - RADAR_POS.x);
+
+// --- DOM 元素绑定 ---
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+
+const inputs = {
+    Pt: document.getElementById('inputPt'),
+    G: document.getElementById('inputG'),
+    F: document.getElementById('inputF'),
+    Sigma: document.getElementById('inputSigma')
+};
+
+const displays = {
+    Pt: document.getElementById('valPt'),
+    G: document.getElementById('valG'),
+    F: document.getElementById('valF'),
+    Sigma: document.getElementById('valSigma'),
+    Lambda: document.getElementById('outLambda'),
+    Beam: document.getElementById('outBeam'),
+    Rmax: document.getElementById('outRmax'),
+    TargetDist: document.getElementById('outTargetDist'),
+    AlertMiss: document.getElementById('alertMiss')
+};
+
+// --- 核心物理计算逻辑 ---
+function calculatePhysics() {
+    // 读取 UI 设定的物理量
+    const Pt_kW = parseFloat(inputs.Pt.value);
+    state.Pt = Pt_kW * 1000;
+    
+    state.G_dB = parseFloat(inputs.G.value);
+    state.G_lin = Math.pow(10, state.G_dB / 10);
+    
+    const f_GHz = parseFloat(inputs.F.value);
+    state.f = f_GHz * 1e9;
+    state.lambda = CONSTANTS.c / state.f;
+    
+    state.sigma = parseFloat(inputs.Sigma.value);
+
+    // 1. 根据雷达距离方程计算 Rmax
+    // R_max = [ (Pt * G^2 * lambda^2 * sigma) / (k * T * Bn * Fn * SNR * (4pi)^3 * L) ]^(1/4)
+    const numerator = state.Pt * Math.pow(state.G_lin, 2) * Math.pow(state.lambda, 2) * state.sigma;
+    const denominator = CONSTANTS.k * CONSTANTS.T * CONSTANTS.Bn * CONSTANTS.Fn * CONSTANTS.SNR_min * Math.pow(4 * Math.PI, 3) * CONSTANTS.Loss;
+    
+    state.Rmax = Math.pow(numerator / denominator, 0.25);
+
+    // 2. 估算半功率波束宽度 (物理经验公式：增益越高，波束越窄。G ≈ 30000 / (θ_E * θ_H) 假设圆锥波束)
+    // 转换为弧度：Theta_deg ≈ sqrt(30000 / G_lin).
+    let thetaDeg = Math.sqrt(30000 / state.G_lin);
+    // 增加一定的视觉缩放，使 UI 更明显
+    state.beamAngle = (thetaDeg * Math.PI / 180) * 1.5; 
+
+    updateDashboard();
+}
+
+function updateDashboard() {
+    displays.Pt.innerText = inputs.Pt.value;
+    displays.G.innerText = inputs.G.value;
+    displays.F.innerText = inputs.F.value;
+    displays.Sigma.innerText = inputs.Sigma.value;
+
+    displays.Lambda.innerText = state.lambda.toFixed(4) + ' m';
+    displays.Beam.innerText = (state.beamAngle * 180 / Math.PI).toFixed(1) + '°';
+    displays.TargetDist.innerText = (TARGET_DIST_METER / 1000).toFixed(1) + ' km';
+    
+    const rmaxKm = state.Rmax / 1000;
+    displays.Rmax.innerText = rmaxKm.toFixed(1) + ' km';
+
+    if (state.Rmax < TARGET_DIST_METER) {
+        displays.Rmax.style.color = 'var(--text-alert)';
+        displays.AlertMiss.style.display = 'flex';
+    } else {
+        displays.Rmax.style.color = 'var(--text-cyan)';
+        displays.AlertMiss.style.display = 'none';
+    }
+}
+
+// 事件监听
+Object.values(inputs).forEach(input => {
+    input.addEventListener('input', () => {
+        calculatePhysics();
+        // 如果正在发射，清空历史波
+        if (state.pulses.length === 0) {
+            drawFrame(0); // 强制重绘静态帧
+        }
+    });
+});
+
+document.getElementById('btnPulse').addEventListener('click', () => {
+    // 触发一个前向电磁波脉冲
+    state.pulses.push({
+        type: 'tx',         // tx: 发射, rx: 回波
+        r: 0,               // 当前半径像素
+        speed: 4,           // 动画演化速度 (模拟光速缩放)
+        maxR: state.Rmax * SCALE.meterToPx, // 物理衰减极点
+        active: true,
+        bounced: false      // 是否已产生回波
+    });
+});
+
+// --- Canvas 渲染引擎 ---
+
+function drawGrid() {
+    ctx.strokeStyle = 'rgba(0, 255, 100, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= canvas.width; x += 40) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+    }
+    for (let y = 0; y <= canvas.height; y += 40) {
+        ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+    }
+    ctx.stroke();
+
+    // 绘制距离同心圆刻度 (50km, 100km, 150km...)
+    ctx.strokeStyle = 'rgba(0, 255, 100, 0.05)';
+    ctx.setLineDash([5, 5]);
+    for(let d = 50000; d <= 300000; d += 50000) {
+        ctx.beginPath();
+        ctx.arc(RADAR_POS.x, RADAR_POS.y, d * SCALE.meterToPx, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    ctx.setLineDash([]);
+}
+
+function drawRadarAndTarget() {
+    // 绘制雷达天线 (带光晕效果)
+    ctx.save();
+    ctx.translate(RADAR_POS.x, RADAR_POS.y);
+    ctx.rotate(TARGET_ANGLE);
+    
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#00ff66';
+    ctx.fillStyle = '#000';
+    ctx.strokeStyle = '#00ff66';
+    ctx.lineWidth = 2;
+    
+    // 抛物面天线示意图
+    ctx.beginPath();
+    ctx.arc(0, 0, 20, -Math.PI/2.5, Math.PI/2.5);
+    ctx.lineTo(5, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 馈源
+    ctx.beginPath();
+    ctx.arc(12, 0, 3, 0, Math.PI*2);
+    ctx.fillStyle = '#00ff66';
+    ctx.fill();
+    ctx.restore();
+
+    // 绘制目标 (战机轮廓)
+    ctx.save();
+    ctx.translate(TARGET_POS.x, TARGET_POS.y);
+    ctx.rotate(TARGET_ANGLE); // 朝向雷达
+    
+    // 如果在探测范围内，高亮红色，否则暗红色
+    let isDetectable = state.Rmax >= TARGET_DIST_METER;
+    ctx.shadowBlur = isDetectable ? 15 : 2;
+    ctx.shadowColor = isDetectable ? '#ff3333' : '#550000';
+    ctx.fillStyle = isDetectable ? '#ff3333' : '#550000';
+    
+    // 简易战机几何形状
+    ctx.beginPath();
+    ctx.moveTo(15, 0);   // 机鼻
+    ctx.lineTo(5, 5);
+    ctx.lineTo(-5, 15);  // 右翼
+    ctx.lineTo(-8, 15);
+    ctx.lineTo(-5, 5);
+    ctx.lineTo(-10, 5);
+    ctx.lineTo(-15, 10); // 右尾翼
+    ctx.lineTo(-15, -10); // 左尾翼
+    ctx.lineTo(-10, -5);
+    ctx.lineTo(-5, -5);
+    ctx.lineTo(-8, -15);
+    ctx.lineTo(-5, -15); // 左翼
+    ctx.lineTo(5, -5);
+    ctx.closePath();
+    ctx.fill();
+    
+    // 目标截面积 (RCS) 视觉反馈 - 截面积越大，核心越亮越宽
+    if(isDetectable) {
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.sqrt(state.sigma)*1.5, 0, Math.PI*2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+function drawRmaxBoundary() {
+    // 绘制基于物理公式演算的有效辐射边界
+    const rmaxPx = state.Rmax * SCALE.meterToPx;
+    
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(RADAR_POS.x, RADAR_POS.y);
+    ctx.arc(RADAR_POS.x, RADAR_POS.y, rmaxPx, TARGET_ANGLE - state.beamAngle/2, TARGET_ANGLE + state.beamAngle/2);
+    ctx.closePath();
+    
+    // 渐变填充表示能量衰减 (1/R^4 衰减极快，这里用线性渐变近似视觉表达)
+    let gradient = ctx.createRadialGradient(RADAR_POS.x, RADAR_POS.y, 0, RADAR_POS.x, RADAR_POS.y, rmaxPx);
+    gradient.addColorStop(0, 'rgba(0, 255, 255, 0.2)');
+    gradient.addColorStop(1, 'rgba(0, 255, 255, 0.0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    
+    // 边缘虚线
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function updateAndDrawWaves() {
+    for (let i = state.pulses.length - 1; i >= 0; i--) {
+        let p = state.pulses[i];
+        if (!p.active) continue;
+
+        // 传播
+        p.r += p.speed;
+
+        ctx.save();
+        ctx.beginPath();
+        
+        if (p.type === 'tx') {
+            // 发射波：沿波束角向外扩展的弧线
+            ctx.arc(RADAR_POS.x, RADAR_POS.y, p.r, TARGET_ANGLE - state.beamAngle/2, TARGET_ANGLE + state.beamAngle/2);
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ffff';
+            ctx.stroke();
+
+            // 能量耗尽 (超出 Rmax)
+            if (p.r > p.maxR) {
+                p.active = false;
+            }
+
+            // 碰撞检测：波到达目标
+            if (!p.bounced && p.r >= TARGET_DIST_PX) {
+                p.bounced = true;
+                // 严谨物理判定：仅当目标在 Rmax 内，且被波束覆盖时，才产生有效回波
+                if (TARGET_DIST_METER <= state.Rmax) {
+                    state.pulses.push({
+                        type: 'rx',
+                        r: 0,
+                        speed: p.speed,
+                        active: true
+                    });
+                }
+            }
+        } else if (p.type === 'rx') {
+            // 回波：从目标向四周球面反射 (雷达截面积散射)
+            ctx.arc(TARGET_POS.x, TARGET_POS.y, p.r, 0, Math.PI*2);
+            // 信号极弱，红色预警
+            ctx.strokeStyle = 'rgba(255, 50, 50, 0.8)'; 
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = '#ff3333';
+            ctx.stroke();
+
+            // 回波到达雷达接收机
+            if (p.r >= TARGET_DIST_PX) {
+                p.active = false;
+                // 触发 UI 锁定动画 (简单闪烁)
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+                ctx.fillRect(0,0,canvas.width, canvas.height);
+                document.getElementById('app-container').style.borderColor = '#ff3333';
+                setTimeout(() => {
+                    document.getElementById('app-container').style.borderColor = '#004422';
+                }, 100);
+            }
+        }
+        ctx.restore();
+    }
+    
+    // 清理非活动脉冲
+    state.pulses = state.pulses.filter(p => p.active);
+}
+
+// 渲染主循环
+let lastTime = 0;
+function drawFrame(timestamp) {
+    // 控制帧率或仅在有动画时清除
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    drawGrid();
+    drawRmaxBoundary();
+    updateAndDrawWaves();
+    drawRadarAndTarget();
+    
+    // 绘制坐标轴标注文本
+    ctx.fillStyle = 'rgba(0, 255, 100, 0.5)';
+    ctx.font = '10px Courier New';
+    ctx.fillText('0 km', RADAR_POS.x - 10, RADAR_POS.y + 20);
+    ctx.fillText('300 km (空间映射)', 680, 580);
+    
+    requestAnimationFrame(drawFrame);
+}
+
+// 初始化
+calculatePhysics();
+requestAnimationFrame(drawFrame);
+
+</script>
+</body>
+</html>

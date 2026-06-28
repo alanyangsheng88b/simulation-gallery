@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>电子仿真 · 小程序画廊</title>
+  <meta name="description" content="交互式电子/物理仿真小程序集合 — 天线辐射、电磁场可视化、电路仿真器、物理力学">
+  <meta name="keywords" content="电子仿真,天线,电磁波,麦克斯韦,电路仿真,物理仿真,HTML5,Canvas">
+  <meta property="og:title" content="电子仿真 · 小程序画廊">
+  <meta property="og:description" content="交互式电子/物理仿真小程序集合">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_CN">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="电子仿真 · 小程序画廊">
+  <meta name="twitter:description" content="交互式电子/物理仿真小程序集合">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preload" href="data/simulations.json" as="fetch" crossorigin="anonymous">
+</head>
+<body>
+  <!-- ============================================================ -->
+  <!-- Header -->
+  <!-- ============================================================ -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <h1 class="logo-title">电子仿真<span class="logo-subtitle">· 小程序画廊</span></h1>
+      </div>
+      <p class="header-desc">
+        交互式电子与物理仿真集合 — 天线辐射 · 电磁场可视化 · 电路仿真 · 经典力学
+      </p>
+      <div class="header-meta">
+        <span class="meta-badge">12 个仿真</span>
+        <span class="meta-badge">4 个分类</span>
+        <span class="meta-badge">开源免费</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- Filter Bar -->
+  <!-- ============================================================ -->
+  <nav class="filter-bar" aria-label="分类过滤">
+    <div class="filter-inner">
+      <button class="filter-pill active" data-category="all" aria-pressed="true">
+        <span class="pill-icon">📂</span> 全部
+      </button>
+      <button class="filter-pill" data-category="antenna" aria-pressed="false">
+        <span class="pill-icon">📡</span> 天线与辐射
+      </button>
+      <button class="filter-pill" data-category="field-kinematics" aria-pressed="false">
+        <span class="pill-icon">🧲</span> 场动力学
+      </button>
+      <button class="filter-pill" data-category="mechanics" aria-pressed="false">
+        <span class="pill-icon">🏀</span> 力学
+      </button>
+      <button class="filter-pill" data-category="circuit" aria-pressed="false">
+        <span class="pill-icon">🔌</span> 电路
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================ -->
+  <!-- Main Content -->
+  <!-- ============================================================ -->
+  <main class="gallery-container">
+    <!-- Loading skeletons (shown while JSON loads) -->
+    <div id="skeleton-grid" class="card-grid" aria-label="加载中">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+
+    <!-- Card grid (populated by JS) -->
+    <div id="card-grid" class="card-grid hidden" aria-label="仿真列表"></div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="empty-state hidden" aria-live="polite">
+      <div class="empty-icon">🔍</div>
+      <h3 class="empty-title">该分类暂无仿真</h3>
+      <p class="empty-desc">试试选择其他分类，或查看全部仿真</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="error-state" class="empty-state hidden" aria-live="assertive">
+      <div class="empty-icon">⚠️</div>
+      <h3 class="empty-title">加载失败</h3>
+      <p class="empty-desc">无法加载仿真列表，请检查网络后重试</p>
+      <button id="retry-btn" class="retry-btn">🔄 重新加载</button>
+    </div>
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- Modal Overlay (iframe sandbox) -->
+  <!-- ============================================================ -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="仿真运行窗口">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <!-- Modal header -->
+      <div class="modal-header">
+        <h2 id="modal-title" class="modal-title">仿真加载中...</h2>
+        <div class="modal-actions">
+          <button id="modal-fullscreen" class="modal-btn" title="全屏" aria-label="全屏">
+            ⛶
+          </button>
+          <button id="modal-close" class="modal-btn modal-close-btn" title="关闭 (Esc)" aria-label="关闭">
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading spinner -->
+      <div id="modal-loading" class="modal-loading" aria-live="polite">
+        <div class="spinner"></div>
+        <p class="loading-text">加载仿真中...</p>
+      </div>
+
+      <!-- Error in modal -->
+      <div id="modal-error" class="modal-error hidden" aria-live="assertive">
+        <div class="empty-icon">⚠️</div>
+        <h3 class="empty-title">仿真加载失败</h3>
+        <p class="empty-desc">可能由于网络问题或仿真文件丢失</p>
+        <button id="modal-retry" class="retry-btn">🔄 重试</button>
+      </div>
+
+      <!-- iframe container -->
+      <div id="modal-iframe-wrapper" class="modal-iframe-wrapper hidden">
+        <iframe
+          id="modal-iframe"
+          title="仿真运行窗口"
+          sandbox="allow-scripts allow-same-origin"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          allow="fullscreen"
+        ></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- Footer -->
+  <!-- ============================================================ -->
+  <footer class="site-footer">
+    <p>
+      基于 HTML5 Canvas + Web 技术构建 ·
+      <a href="https://github.com" target="_blank" rel="noopener">GitHub</a> 开源 ·
+      中国大陆 & 全球可访问
+    </p>
+  </footer>
+
+  <script src="gallery.js"></script>
+</body>
+</html>

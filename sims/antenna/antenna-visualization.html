@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全向天线 vs 定向天线 — 电磁波辐射可视化</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-secondary: #8b949e;
+    --accent: #58a6ff;
+    --omni-color: #3fb950;
+    --dir-color: #f0883e;
+    --danger: #f85149;
+    --purple: #bc8cff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    padding: 32px 20px 20px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #1a2332 0%, var(--bg) 100%);
+  }
+  .header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    background: linear-gradient(135deg, #58a6ff, #bc8cff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+  .header .subtitle {
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+  .header .highlight {
+    color: var(--danger);
+    font-weight: 600;
+  }
+
+  /* ── Main Layout ── */
+  .main-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 20px;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-header {
+    padding: 14px 18px;
+    font-weight: 600;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-omni .panel-header { border-left: 4px solid var(--omni-color); }
+  .panel-dir .panel-header { border-left: 4px solid var(--dir-color); }
+  .dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .dot-omni { background: var(--omni-color); box-shadow: 0 0 8px var(--omni-color); }
+  .dot-dir { background: var(--dir-color); box-shadow: 0 0 8px var(--dir-color); }
+
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    min-height: 380px;
+  }
+  .canvas-wrap canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .panel-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  .stat {
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-omni .stat-value { color: var(--omni-color); }
+  .stat-dir .stat-value { color: var(--dir-color); }
+  .stat-label {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    margin-top: 2px;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    max-width: 1300px;
+    margin: 0 auto 20px;
+    padding: 0 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .control-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .control-card h3 {
+    font-size: 0.95rem;
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .slider-group {
+    margin-bottom: 14px;
+  }
+  .slider-group:last-child { margin-bottom: 0; }
+  .slider-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.88rem;
+    margin-bottom: 6px;
+  }
+  .slider-group input[type=range] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+
+  /* ── Radar Equation Card ── */
+  .equation-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .equation-card h3 {
+    font-size: 0.95rem;
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .formula {
+    font-size: 1.15rem;
+    text-align: center;
+    padding: 10px;
+    color: var(--purple);
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-weight: 600;
+  }
+  .insight {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: rgba(248, 81, 73, 0.1);
+    border: 1px solid rgba(248, 81, 73, 0.25);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    line-height: 1.6;
+  }
+  .insight strong { color: var(--danger); }
+
+  /* ── Info Footer ── */
+  .info-grid {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 0 20px 30px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .info-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    font-size: 0.88rem;
+    line-height: 1.65;
+  }
+  .info-card h4 {
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+  }
+  .info-card.omni-card h4 { color: var(--omni-color); }
+  .info-card.dir-card h4 { color: var(--dir-color); }
+  .info-card.math-card h4 { color: var(--purple); }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .main-container { grid-template-columns: 1fr; }
+    .info-grid { grid-template-columns: 1fr; }
+    .canvas-wrap { min-height: 280px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ──── Header ──── -->
+<div class="header">
+  <h1>全向天线 vs 定向天线</h1>
+  <p class="subtitle">
+    天线本身<span class="highlight">不凭空放大发射功率</span>，只是<span class="highlight">重新分配</span>电磁波能量。
+    同等发射功率下，定向天线把能量聚焦到一个方向，换取更远的传输距离。
+  </p>
+</div>
+
+<!-- ──── Two Panels ──── -->
+<div class="main-container">
+
+  <!-- Omni Panel -->
+  <div class="panel panel-omni" id="panel-omni">
+    <div class="panel-header">
+      <span class="dot dot-omni"></span> 全向天线（广播 / 基站）
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="canvas-omni"></canvas>
+    </div>
+    <div class="panel-stats stat-omni">
+      <div class="stat">
+        <div class="stat-value" id="omni-range">1.0 km</div>
+        <div class="stat-label">全向覆盖距离</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="omni-coverage">360°</div>
+        <div class="stat-label">水平覆盖角度</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="omni-gain">0 dBi</div>
+        <div class="stat-label">天线增益</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Directional Panel -->
+  <div class="panel panel-dir" id="panel-dir">
+    <div class="panel-header">
+      <span class="dot dot-dir"></span> 定向天线（雷达 / 点对点）
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="canvas-dir"></canvas>
+    </div>
+    <div class="panel-stats stat-dir">
+      <div class="stat">
+        <div class="stat-value" id="dir-range">3.2 km</div>
+        <div class="stat-label">主瓣覆盖距离</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="dir-beamwidth">30°</div>
+        <div class="stat-label">波束宽度</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="dir-gain">10 dBi</div>
+        <div class="stat-label">天线增益</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──── Controls ──── -->
+<div class="controls">
+
+  <div class="control-card">
+    <h3>⚙️ 参数调节</h3>
+    <div class="slider-group">
+      <label>定向天线增益 <span id="gain-val">10 dBi</span></label>
+      <input type="range" id="gain-slider" min="0" max="30" value="10" step="0.5">
+    </div>
+    <div class="slider-group">
+      <label>发射功率因子 <span id="power-val">1×</span></label>
+      <input type="range" id="power-slider" min="1" max="16" value="1" step="0.5">
+    </div>
+    <div class="slider-group">
+      <label>动画速度 <span>▸▸</span></label>
+      <input type="range" id="speed-slider" min="1" max="5" value="3" step="0.5">
+    </div>
+  </div>
+
+  <div class="equation-card">
+    <h3>📐 雷达方程</h3>
+    <div class="formula">R<sub>max</sub> ∝ (P × G²)<sup>1/4</sup></div>
+    <div class="insight" id="insight-box">
+      <strong>💡 关键结论：</strong>探测距离提高 <strong>1 倍</strong>，需要功率增大 <strong>16 倍</strong>，
+      或天线增益提高 <strong>4 倍（6 dB）</strong>。<br>
+      天线增益与最大探测距离的 <strong>四次方根</strong> 正相关。
+    </div>
+  </div>
+
+  <div class="control-card">
+    <h3>🎯 视角切换</h3>
+    <div class="slider-group">
+      <label>显示辐射方向图</label>
+      <input type="checkbox" id="show-pattern" checked style="accent-color:var(--accent);">
+    </div>
+    <div class="slider-group">
+      <label>显示距离环</label>
+      <input type="checkbox" id="show-rings" checked style="accent-color:var(--accent);">
+    </div>
+    <div class="slider-group">
+      <label>显示波前动画</label>
+      <input type="checkbox" id="show-waves" checked style="accent-color:var(--accent);">
+    </div>
+    <div class="slider-group">
+      <label>同步两图比例尺</label>
+      <input type="checkbox" id="sync-scale" checked style="accent-color:var(--accent);">
+    </div>
+  </div>
+
+</div>
+
+<!-- ──── Info Cards ──── -->
+<div class="info-grid">
+  <div class="info-card omni-card">
+    <h4>📡 全向天线特征</h4>
+    <p>
+      辐射形态：水平面环形覆盖，立体呈<strong>甜甜圈</strong>形状，无指向性。<br>
+      典型用途：调频广播、手机基站、WiFi 路由器、对讲机。<br>
+      ✅ 无需对准，覆盖范围广<br>
+      ❌ 能量分散，增益低，传输距离有限
+    </p>
+  </div>
+  <div class="info-card dir-card">
+    <h4>🎯 定向天线特征</h4>
+    <p>
+      辐射形态：波束高度汇聚，类似<strong>手电筒光束</strong>，仅主瓣方向信号极强。<br>
+      典型用途：雷达、卫星接收锅、远距离网桥、微波中继。<br>
+      ✅ 增益高、传输远、抗干扰强<br>
+      ❌ 需精准对准，无法覆盖多方向
+    </p>
+  </div>
+  <div class="info-card math-card">
+    <h4>🔬 物理本质</h4>
+    <p>
+      天线是<strong>无源器件</strong>——它不产生能量，只改变能量空间分布。<br>
+      高增益 = 牺牲覆盖广度，换取单一方向远距离。<br>
+      这就像把水管口捏扁：总水量不变，但水柱射得更远。
+    </p>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  Antenna Radiation Pattern Simulator
+// ═══════════════════════════════════════
+
+(function() {
+  // ── DOM refs ──
+  const canvasOmni = document.getElementById('canvas-omni');
+  const canvasDir = document.getElementById('canvas-dir');
+  const gainSlider = document.getElementById('gain-slider');
+  const powerSlider = document.getElementById('power-slider');
+  const speedSlider = document.getElementById('speed-slider');
+  const gainVal = document.getElementById('gain-val');
+  const powerVal = document.getElementById('power-val');
+  const showPattern = document.getElementById('show-pattern');
+  const showRings = document.getElementById('show-rings');
+  const showWaves = document.getElementById('show-waves');
+  const syncScale = document.getElementById('sync-scale');
+
+  const omniRangeEl = document.getElementById('omni-range');
+  const omniCoverageEl = document.getElementById('omni-coverage');
+  const omniGainEl = document.getElementById('omni-gain');
+  const dirRangeEl = document.getElementById('dir-range');
+  const dirBeamwidthEl = document.getElementById('dir-beamwidth');
+  const dirGainEl = document.getElementById('dir-gain');
+  const insightBox = document.getElementById('insight-box');
+
+  // ── State ──
+  let dirGain_dBi = 10;
+  let powerFactor = 1;
+  let animSpeed = 3;
+  let time = 0;
+
+  // ── Resize / DPI ──
+  function setupCanvas(canvas) {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = rect.width;
+    const h = rect.height;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+    }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w, h, cx: w/2, cy: h/2, r: Math.min(w, h) * 0.40 };
+  }
+
+  let cachedCanvasInfo = null;
+  function getCanvasInfo() {
+    if (!cachedCanvasInfo) {
+      cachedCanvasInfo = {
+        omni: setupCanvas(canvasOmni),
+        dir: setupCanvas(canvasDir),
+      };
+    }
+    return cachedCanvasInfo;
+  }
+
+  function resizeAll() {
+    cachedCanvasInfo = null;
+    return getCanvasInfo();
+  }
+
+  // ── Drawing helpers ──
+  function drawGrid(ctx, info, color) {
+    const { cx, cy, r } = info;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = 0.2;
+
+    // concentric circles
+    const steps = 5;
+    for (let i = 1; i <= steps; i++) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * i / steps, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // cross lines
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
+    ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+  }
+
+  // Draw omnidirectional radiation pattern (nearly circular)
+  function drawOmniPattern(ctx, info) {
+    const { cx, cy, r } = info;
+    ctx.strokeStyle = '#3fb950';
+    ctx.lineWidth = 2.5;
+    ctx.globalAlpha = 0.7;
+    ctx.setLineDash([6, 3]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.95, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+
+    // fill
+    ctx.fillStyle = 'rgba(63,185,80,0.06)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.95, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw directional radiation pattern (focused cardioid/lobe)
+  function drawDirPattern(ctx, info, gain_dBi) {
+    const { cx, cy, r } = info;
+
+    // Convert gain dBi → beam width approximation
+    // Higher gain → narrower beam
+    // Typical: 0 dBi → omnidirectional, 10 dBi → ~60°, 20 dBi → ~20°, 30 dBi → ~5°
+    const beamWidthDeg = Math.max(3, 360 / Math.pow(10, gain_dBi / 15));
+    const beamWidthRad = (beamWidthDeg * Math.PI) / 180;
+
+    // Draw main lobe shape
+    ctx.fillStyle = 'rgba(240,136,62,0.12)';
+    ctx.strokeStyle = '#f0883e';
+    ctx.lineWidth = 2.5;
+    ctx.globalAlpha = 0.7;
+    ctx.setLineDash([6, 3]);
+
+    // Main lobe pointing right (angle 0)
+    ctx.beginPath();
+    const anglePoints = 360;
+    for (let i = 0; i <= anglePoints; i++) {
+      const angle = (i / anglePoints) * Math.PI * 2 - Math.PI;
+      // Cardioid-like pattern: main lobe forward, minimal backward
+      const lobeFactor = Math.pow(Math.cos(angle / 2), gain_dBi * 0.08 + 1.5);
+      const rr = r * Math.max(0.02, lobeFactor);
+      const x = cx + Math.cos(angle) * rr;
+      const y = cy + Math.sin(angle) * rr;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+
+    return beamWidthDeg;
+  }
+
+  // Draw animated wavefronts
+  function drawWaves(ctx, info, isDirectional, gain_dBi, t) {
+    const { cx, cy, r } = info;
+    const numWaves = 8;
+    const waveSpacing = r / numWaves;
+    const speed = animSpeed * 0.6;
+
+    for (let w = 0; w < numWaves; w++) {
+      let dist = ((t * speed + w * waveSpacing) % r);
+      const alpha = 1 - dist / r;
+
+      if (isDirectional) {
+        // Directional: waves only in forward sector
+        const beamWidthDeg = Math.max(3, 360 / Math.pow(10, gain_dBi / 15));
+        const halfBeam = (beamWidthDeg * Math.PI) / 360;
+        const angleStart = -halfBeam;
+        const angleEnd = halfBeam;
+
+        // Main lobe waves
+        ctx.strokeStyle = `rgba(240,136,62,${alpha * 0.7})`;
+        ctx.lineWidth = 2.5 * alpha + 0.5;
+        ctx.beginPath();
+        const steps = 60;
+        for (let i = 0; i <= steps; i++) {
+          const angle = angleStart + (i / steps) * (angleEnd - angleStart);
+          const x = cx + Math.cos(angle) * dist;
+          const y = cy + Math.sin(angle) * dist;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Very weak side waves
+        ctx.strokeStyle = `rgba(240,136,62,${alpha * 0.1})`;
+        ctx.lineWidth = 0.8 * alpha + 0.2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, dist, angleEnd, Math.PI * 2 + angleStart);
+        ctx.stroke();
+
+      } else {
+        // Omnidirectional: uniform circular waves
+        ctx.strokeStyle = `rgba(63,185,80,${alpha * 0.65})`;
+        ctx.lineWidth = 2 * alpha + 0.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, dist, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Draw antenna element
+  function drawAntenna(ctx, info, isDirectional) {
+    const { cx, cy, r } = info;
+
+    if (isDirectional) {
+      // Parabolic dish / Yagi representation
+      const dishR = r * 0.12;
+
+      // Reflector (dish arc)
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx - dishR * 0.5, cy, dishR, -Math.PI/2.5, Math.PI/2.5);
+      ctx.stroke();
+
+      // Feed element (dipole)
+      ctx.fillStyle = '#f0883e';
+      ctx.fillRect(cx - 2, cy - dishR * 0.65, 4, dishR * 1.3);
+
+      // Directors (Yagi elements)
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 1;
+      const dirSpacing = dishR * 0.4;
+      for (let i = 1; i <= 3; i++) {
+        const dx = cx + dirSpacing * i;
+        const dh = dishR * 0.5 * (1 - i * 0.15);
+        ctx.beginPath();
+        ctx.moveTo(dx, cy - dh);
+        ctx.lineTo(dx, cy + dh);
+        ctx.stroke();
+      }
+
+      // Center dot
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+    } else {
+      // Dipole antenna
+      const dipoleLen = r * 0.18;
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+
+      // Upper element
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 3);
+      ctx.lineTo(cx, cy - dipoleLen);
+      ctx.stroke();
+
+      // Lower element
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + 3);
+      ctx.lineTo(cx, cy + dipoleLen);
+      ctx.stroke();
+
+      // Feed point
+      ctx.fillStyle = '#3fb950';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Small gap indicator
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, cy - 1);
+      ctx.lineTo(cx + 6, cy - 1);
+      ctx.moveTo(cx - 6, cy + 1);
+      ctx.lineTo(cx + 6, cy + 1);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Draw range comparison overlay
+  function drawRangeOverlay(ctx, info, isDirectional, omniRangeR, dirRangeR, gain_dBi) {
+    if (!showRings.checked) return;
+    const { cx, cy } = info;
+
+    // Omni range ring (reference)
+    ctx.setLineDash([3, 5]);
+    ctx.strokeStyle = 'rgba(139,148,158,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, omniRangeR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Label
+    ctx.fillStyle = '#8b949e';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('全向覆盖 1×', cx + omniRangeR - 4, cy - 6);
+
+    if (!isDirectional) return;
+
+    // Directional range mark on the omni canvas (for scale reference)
+    ctx.setLineDash([3, 5]);
+    ctx.strokeStyle = 'rgba(240,136,62,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, dirRangeR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#f0883e';
+    ctx.fillText('定向可达 ' + dirRangeR.toFixed(1) + '×', cx + dirRangeR - 4, cy - 6);
+  }
+
+  // ── Main render ──
+  function render(timestamp) {
+    time = timestamp * 0.001;
+
+    const { omni, dir } = getCanvasInfo();
+    const dirGain = dirGain_dBi;
+    const dirGainLinear = Math.pow(10, dirGain / 10);
+
+    // ── Range calculation (Radar equation based) ──
+    // R_max ∝ (P × G²)^(1/4)
+    // For omnidirectional: G ≈ 1 (0 dBi), P = powerFactor
+    // For directional: G = dirGainLinear (linear), same P
+    const omniRangeR = omni.r * 0.3 * Math.pow(powerFactor, 0.25);
+    const dirRangeFactor = Math.pow(dirGainLinear, 0.5) * Math.pow(powerFactor, 0.25);
+    const dirRangeR = omni.r * 0.3 * dirRangeFactor;
+
+    // Beam width
+    const beamWidthDeg = Math.max(3, 360 / Math.pow(10, dirGain / 15));
+
+    // ── Update UI stats ──
+    omniRangeEl.textContent = (1.0 * Math.pow(powerFactor, 0.25)).toFixed(2) + ' km';
+    omniCoverageEl.textContent = '360°';
+    omniGainEl.textContent = '0 dBi';
+    dirRangeEl.textContent = (1.0 * dirRangeFactor).toFixed(2) + ' km';
+    dirBeamwidthEl.textContent = beamWidthDeg.toFixed(0) + '°';
+    dirGainEl.textContent = dirGain.toFixed(1) + ' dBi';
+
+    // Update insight box
+    const rangeRatio = dirRangeFactor / Math.pow(powerFactor, 0.25);
+    const powerNeeded16 = Math.pow(2, 4); // always 16 for 2x range
+    const gainNeeded4 = Math.pow(2, 2);   // always 4 for 2x range
+    const powerForCurrent = Math.pow(rangeRatio, 4);
+    insightBox.innerHTML = `
+      <strong>💡 当前状态：</strong>定向天线主瓣方向距离是全向的 <strong style="color:#f0883e">${rangeRatio.toFixed(1)}×</strong> 倍。<br>
+      如果探测距离要提高 <strong>2 倍</strong>（且保持全向覆盖），发射功率需要增大 <strong style="color:#f85149">16 倍</strong>。<br>
+      如果靠天线增益实现，增益需要提高 <strong style="color:#f85149">4 倍（+6 dB）</strong>——代价是波束更窄。<br>
+      <span style="color:#8b949e;">R<sub>max</sub> ∝ (P × G²)<sup>1/4</sup> — 天线增益与探测距离的四次方根正相关。</span>
+    `;
+
+    // ── Draw Omni Panel ──
+    {
+      const { ctx, w, h, cx, cy, r } = omni;
+      ctx.clearRect(0, 0, w, h);
+
+      // Background
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, w, h);
+
+      drawGrid(ctx, omni, '#3fb950');
+
+      if (showWaves.checked) {
+        drawWaves(ctx, omni, false, 0, time);
+      }
+
+      if (showPattern.checked) {
+        drawOmniPattern(ctx, omni);
+      }
+
+      // Range overlay
+      const scaleR = syncScale.checked ? Math.max(dirRangeR, omniRangeR) : omniRangeR;
+      const omniDisplayR = omniRangeR;
+      drawRangeOverlay(ctx, omni, true, omniDisplayR, dirRangeR, dirGain);
+
+      drawAntenna(ctx, omni, false);
+
+      // Title
+      ctx.fillStyle = '#8b949e';
+      ctx.font = '11px -apple-system, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('水平面辐射方向图（俯视图）', 12, h - 12);
+      ctx.textAlign = 'center';
+      ctx.fillText('全向覆盖 360°', cx, cy + r + 22);
+    }
+
+    // ── Draw Directional Panel ──
+    {
+      const { ctx, w, h, cx, cy, r } = dir;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, w, h);
+
+      drawGrid(ctx, dir, '#f0883e');
+
+      if (showWaves.checked) {
+        drawWaves(ctx, dir, true, dirGain, time);
+      }
+
+      if (showPattern.checked) {
+        drawDirPattern(ctx, dir, dirGain);
+      }
+
+      // Range overlay
+      const dirDisplayR = Math.min(dirRangeR, r * 0.95);
+      drawRangeOverlay(ctx, dir, true, omniRangeR, dirDisplayR, dirGain);
+
+      drawAntenna(ctx, dir, true);
+
+      // Beam angle indicator
+      const halfBeam = (beamWidthDeg * Math.PI) / 360;
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = 'rgba(240,136,62,0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(-halfBeam) * r, cy + Math.sin(-halfBeam) * r);
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(halfBeam) * r, cy + Math.sin(halfBeam) * r);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Beam width label
+      const labelAngle = halfBeam / 2;
+      const labelR = r * 0.7;
+      ctx.fillStyle = '#f0883e';
+      ctx.font = '11px -apple-system, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(beamWidthDeg.toFixed(0) + '°', cx + Math.cos(labelAngle) * labelR + 4, cy + 8);
+
+      // Title
+      ctx.fillStyle = '#8b949e';
+      ctx.font = '11px -apple-system, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('波束聚焦 — 能量集中在前方', 12, h - 12);
+      ctx.textAlign = 'center';
+      ctx.fillText(`主瓣方向增益 ${dirGain.toFixed(1)} dBi`, cx, cy + r + 22);
+    }
+
+    requestAnimationFrame(render);
+  }
+
+  // ── Event listeners ──
+  gainSlider.addEventListener('input', () => {
+    dirGain_dBi = parseFloat(gainSlider.value);
+    gainVal.textContent = dirGain_dBi.toFixed(1) + ' dBi';
+  });
+
+  powerSlider.addEventListener('input', () => {
+    powerFactor = parseFloat(powerSlider.value);
+    powerVal.textContent = powerFactor.toFixed(1) + '×';
+  });
+
+  speedSlider.addEventListener('input', () => {
+    animSpeed = parseFloat(speedSlider.value);
+  });
+
+  // ── Initial resize on window change ──
+  let resizeDebounce;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeDebounce);
+    resizeDebounce = setTimeout(resizeAll, 150);
+  });
+
+  // ── Start ──
+  resizeAll();
+  requestAnimationFrame(render);
+
+})();
+</script>
+
+</body>
+</html>

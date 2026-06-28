@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电磁波辐射特性演示：全向辐射 vs 定向窄波束</title>
+    <!-- Tailwind CSS (用于界面布局) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
+        body {
+            font-family: 'Fira Code', 'Courier New', Courier, monospace, "Microsoft YaHei";
+            background-color: #000000;
+            overflow: hidden;
+        }
+        /* 霓虹发光文字特效 */
+        .neon-text-green {
+            text-shadow: 0 0 10px rgba(34, 197, 94, 0.8), 0 0 20px rgba(34, 197, 94, 0.4);
+        }
+        .neon-text-red {
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.4);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen text-slate-100 p-4">
+
+    <!-- 主容器 -->
+    <div class="w-full max-w-5xl bg-black border border-emerald-900/40 rounded-xl overflow-hidden shadow-2xl flex flex-col">
+        <!-- 顶部控制面板/标题 (EDA 工业风) -->
+        <div class="bg-zinc-950 border-b border-emerald-900/30 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <h1 class="text-xl font-bold tracking-wider text-emerald-400">ELECTROMAGNETIC RADIATION VISUALIZER</h1>
+                <span class="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded border border-zinc-700">v1.2.0</span>
+            </div>
+            
+            <!-- 简易控制区 -->
+            <div class="flex items-center gap-4 text-xs">
+                <button id="btnPause" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded transition duration-200">
+                    暂停动画
+                </button>
+                <button id="btnGrid" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded transition duration-200">
+                    切换网格
+                </button>
+                <span class="text-emerald-500 font-semibold" id="fpsDisplay">FPS: --</span>
+            </div>
+        </div>
+
+        <!-- 动画主视口 (4:3 比例保持) -->
+        <div class="relative w-full bg-black flex justify-center items-center" style="aspect-ratio: 4/3;">
+            <canvas id="mainCanvas" class="absolute inset-0 w-full h-full cursor-crosshair"></canvas>
+            
+            <!-- 实时信号状态悬浮贴片 -->
+            <div class="absolute bottom-4 left-4 right-4 flex justify-between pointer-events-none px-4">
+                <div class="bg-black/80 border border-emerald-500/30 rounded p-2 text-[10px] text-emerald-400 font-mono">
+                    [O_MODULE]: TX_POWER: 150kW | FREQ: 98.7MHz | PATTERN: ISOTROPIC
+                </div>
+                <div class="bg-black/80 border border-red-500/30 rounded p-2 text-[10px] text-red-400 font-mono text-right">
+                    [R_MODULE]: PEAK_POWER: 850kW | SCAN_RES: 0.15° | PATTERN: NARROW_BEAM
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部专业技术解说区 -->
+        <div class="bg-zinc-950 border-t border-emerald-900/30 p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+            <div class="border-l-2 border-emerald-500 pl-4 space-y-2">
+                <div class="inline-block bg-[#FFFF00] text-black font-bold px-2 py-0.5 rounded text-xs select-none">
+                    广播信号：全向辐射 (Omnidirectional)
+                </div>
+                <p class="text-zinc-400 leading-relaxed text-xs">
+                    广播塔采用无方向性或水平面全向辐射天线。电磁波在三维空间中犹如不断扩大的球面（在水平面呈环状圆心向外均匀扩散），其目的是让处于塔周围任意方向的接收机均能稳定收听。其能量随距离呈平方反比衰减（$1/d^2$），无法集中投送，不具备测向与定向追踪能力。
+                </p>
+            </div>
+            
+            <div class="border-l-2 border-red-500 pl-4 space-y-2">
+                <div class="inline-block bg-[#FF6600] text-black font-bold px-2 py-0.5 rounded text-xs select-none">
+                    雷达信号：定向窄波束 (Directive Narrow Beam)
+                </div>
+                <p class="text-zinc-400 leading-relaxed text-xs">
+                    雷达系统使用高增益抛物面反射天线，将电磁波汇聚成极窄的“笔形波束”或“扇形波束”定向发射。能量高度集中，能够将强信号精准打在远距离战机目标上，并通过反射回波计算目标的精确方位（$\theta, \phi$）与距离。其主瓣窄、旁瓣极低，具有极佳的抗干扰和跟踪解析度。
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 交互提示说明 -->
+    <div class="mt-4 text-center text-xs text-zinc-500 font-mono">
+        提示：您可以用鼠标在 Canvas 画幅右侧点击拖动，手动控制战机高度与雷达天线俯仰仰角。
+    </div>
+
+    <!-- 运行控制脚本 -->
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const fpsDisplay = document.getElementById('fpsDisplay');
+
+        // 系统运行变量
+        let isRunning = true;
+        let showGrid = true;
+        let lastTime = 0;
+        let frameCount = 0;
+        let fps = 0;
+        let pulseTime = 0; // 信号波纹时间指针
+
+        // 交互参数：空中战机位置 (归一化 0.0 - 1.0 坐标，便于窗口缩放自适应)
+        let targetPos = { x: 0.72, y: 0.28 }; 
+        let isDragging = false;
+
+        // 窗口 resize 监听
+        function resizeCanvas() {
+            // 获取父级容器的实时渲染宽高，并进行高像素画质对齐
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 物理实体尺寸定义
+        function getCanvasSize() {
+            // 返回逻辑尺寸 (Tailwind 容器分配的实际 CSS 尺寸)
+            return {
+                width: canvas.width / window.devicePixelRatio,
+                height: canvas.height / window.devicePixelRatio
+            };
+        }
+
+        // 极细 EDA 网格背景绘制
+        function drawEDAGrid(w, h) {
+            if (!showGrid) return;
+            ctx.save();
+            ctx.strokeStyle = '#051d10';
+            ctx.lineWidth = 0.5;
+
+            const gridSize = 40;
+            // 纵向网格线
+            for (let x = 0; x < w; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+            }
+            // 横向网格线
+            for (let y = 0; y < h; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // 绘制 EDA 细线框工业风广播塔
+        function drawBroadcastTower(x, y, scale = 1.0) {
+            ctx.save();
+            ctx.strokeStyle = '#00ff66';
+            ctx.lineWidth = 1.2;
+            ctx.shadowColor = 'rgba(0, 255, 102, 0.4)';
+            ctx.shadowBlur = 4;
+
+            // 底部水泥基座
+            ctx.fillStyle = '#0a2211';
+            ctx.beginPath();
+            ctx.rect(x - 30 * scale, y, 60 * scale, 8 * scale);
+            ctx.fill();
+            ctx.stroke();
+
+            // 铁塔主框架 (A字型)
+            ctx.beginPath();
+            ctx.moveTo(x - 22 * scale, y);
+            ctx.lineTo(x - 3 * scale, y - 130 * scale);
+            ctx.lineTo(x + 3 * scale, y - 130 * scale);
+            ctx.lineTo(x + 22 * scale, y);
+            ctx.stroke();
+
+            // 塔顶天线极针
+            ctx.beginPath();
+            ctx.moveTo(x, y - 130 * scale);
+            ctx.lineTo(x, y - 160 * scale);
+            ctx.stroke();
+
+            // 塔顶天线球形辐射核心
+            ctx.fillStyle = '#00ff66';
+            ctx.beginPath();
+            ctx.arc(x, y - 160 * scale, 4 * scale, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 横向拉杆
+            const steps = [0.25, 0.5, 0.75, 1.0];
+            const towerHeight = 130 * scale;
+            steps.forEach(ratio => {
+                const hPos = y - towerHeight * ratio;
+                const halfW = 22 * scale * (1.0 - ratio) + 3 * scale * ratio;
+                ctx.beginPath();
+                ctx.moveTo(x - halfW, hPos);
+                ctx.lineTo(x + halfW, hPos);
+                ctx.stroke();
+            });
+
+            // 交叉斜拉撑杆结构
+            for (let i = 0; i < steps.length - 1; i++) {
+                const ratio1 = steps[i];
+                const ratio2 = steps[i+1];
+                const h1 = y - towerHeight * ratio1;
+                const h2 = y - towerHeight * ratio2;
+                const w1 = 22 * scale * (1.0 - ratio1) + 3 * scale * ratio1;
+                const w2 = 22 * scale * (1.0 - ratio2) + 3 * scale * ratio2;
+
+                ctx.beginPath();
+                ctx.moveTo(x - w1, h1);
+                ctx.lineTo(x + w2, h2);
+                ctx.moveTo(x + w1, h1);
+                ctx.lineTo(x - w2, h2);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        // 绘制 360° 全向循环扩散荧光绿色电磁波
+        function drawOmniWaves(cx, cy, radiusMax) {
+            ctx.save();
+            ctx.lineWidth = 2.0;
+            ctx.shadowColor = 'rgba(0, 255, 102, 0.7)';
+            ctx.shadowBlur = 10;
+
+            const waveSpacing = 75; // 波纹间距
+            const waveSpeed = 1.8;   // 扩散速度
+            
+            // 计算当前总周期偏移
+            const offset = (pulseTime * waveSpeed) % waveSpacing;
+
+            for (let r = offset; r < radiusMax; r += waveSpacing) {
+                if (r <= 5) continue;
+                
+                // 计算透明度衰减：越靠近外围，信号衰减越厉害 (模拟 1/d^2 或一维 1/d 物理衰减特征)
+                const opacity = Math.max(0, 1.0 - (r / radiusMax));
+                ctx.strokeStyle = `rgba(0, 255, 102, ${opacity * 0.95})`;
+
+                // 绘制360度完整辐射波纹
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // 绘制 EDA 线框风格抛物面雷达天线
+        function drawRadarDish(x, y, targetX, targetY, scale = 1.0) {
+            ctx.save();
+            ctx.strokeStyle = '#38bdf8'; // 雷达浅蓝色基调
+            ctx.lineWidth = 1.2;
+            ctx.shadowColor = 'rgba(56, 189, 248, 0.4)';
+            ctx.shadowBlur = 4;
+
+            // 计算天线指向夹角
+            const dx = targetX - x;
+            const dy = targetY - y;
+            const angle = Math.atan2(dy, dx);
+
+            // 1. 旋转底座水泥台
+            ctx.fillStyle = '#0b1d28';
+            ctx.beginPath();
+            ctx.ellipse(x, y + 25 * scale, 35 * scale, 10 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 2. 底座支架
+            ctx.beginPath();
+            ctx.moveTo(x - 15 * scale, y + 25 * scale);
+            ctx.lineTo(x - 5 * scale, y);
+            ctx.lineTo(x + 5 * scale, y);
+            ctx.lineTo(x + 15 * scale, y + 25 * scale);
+            ctx.stroke();
+
+            // 3. 俯仰转盘与馈源悬臂
+            ctx.translate(x, y);
+            ctx.rotate(angle); // 整体向目标方向旋转
+
+            // 转盘关节
+            ctx.fillStyle = '#112240';
+            ctx.beginPath();
+            ctx.arc(0, 0, 12 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 绘制抛物面反射叶片
+            ctx.beginPath();
+            // 在旋转坐标系下，-Math.PI/2 到 Math.PI/2 代表正向指向的碗状
+            // 绘制抛物线开口
+            ctx.arc(-5 * scale, 0, 32 * scale, -Math.PI / 2.3, Math.PI / 2.3);
+            ctx.stroke();
+
+            // 抛物面加强骨架线框
+            ctx.beginPath();
+            ctx.moveTo(-30 * scale, 0);
+            ctx.lineTo(-5 * scale, 0);
+            ctx.stroke();
+
+            // 馈源支架 (伸向前方焦点)
+            ctx.beginPath();
+            ctx.moveTo(-15 * scale, -24 * scale);
+            ctx.lineTo(25 * scale, 0);
+            ctx.moveTo(-15 * scale, 24 * scale);
+            ctx.lineTo(25 * scale, 0);
+            ctx.stroke();
+
+            // 馈源喇叭 (焦点处的发射装置)
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.rect(20 * scale, -6 * scale, 8 * scale, 12 * scale);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // 绘制战机剪影 (带电子扫描效果)
+        function drawFighterJet(x, y, scale = 1.0) {
+            ctx.save();
+            ctx.translate(x, y);
+            // 让机头稍微朝向左下方（战斗机俯冲）
+            ctx.rotate(Math.PI / 5);
+
+            // 绘制黑色战机主体剪影
+            ctx.fillStyle = '#000000';
+            ctx.strokeStyle = '#ef4444'; // 红色扫描警告边框
+            ctx.lineWidth = 1.5;
+            ctx.shadowColor = 'rgba(239, 68, 68, 0.7)';
+            ctx.shadowBlur = 6;
+
+            ctx.beginPath();
+            // 机鼻
+            ctx.moveTo(0, -35 * scale);
+            // 右机身 & 鸭翼
+            ctx.lineTo(4 * scale, -15 * scale);
+            ctx.lineTo(12 * scale, -12 * scale);
+            ctx.lineTo(4 * scale, -8 * scale);
+            // 右主翼
+            ctx.lineTo(5 * scale, 10 * scale);
+            ctx.lineTo(32 * scale, 20 * scale);
+            ctx.lineTo(5 * scale, 15 * scale);
+            // 右尾翼
+            ctx.lineTo(4 * scale, 28 * scale);
+            ctx.lineTo(10 * scale, 34 * scale);
+            // 尾喷口
+            ctx.lineTo(0, 31 * scale);
+            // 左侧尾翼对称
+            ctx.lineTo(-10 * scale, 34 * scale);
+            ctx.lineTo(-4 * scale, 28 * scale);
+            // 左侧主翼对称
+            ctx.lineTo(-5 * scale, 15 * scale);
+            ctx.lineTo(-32 * scale, 20 * scale);
+            ctx.lineTo(-5 * scale, 10 * scale);
+            // 左侧鸭翼对称
+            ctx.lineTo(-4 * scale, -8 * scale);
+            ctx.lineTo(-12 * scale, -12 * scale);
+            ctx.lineTo(-4 * scale, -15 * scale);
+            
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 绘制战机座舱
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.6)';
+            ctx.beginPath();
+            ctx.ellipse(0, -8 * scale, 2.5 * scale, 8 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // 绘制雷达定向窄波束，带分段往返流动特效
+        function drawRadarBeams(rx, ry, tx, ty) {
+            ctx.save();
+            
+            // 计算雷达天线中心到战机的具体射线参数
+            const dx = tx - rx;
+            const dy = ty - ry;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+
+            // 建立定向窄波束管槽
+            ctx.translate(rx, ry);
+            ctx.rotate(angle);
+
+            // 1. 雷达定向波束的边界（不发散窄通道极细导引线）
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.15)';
+            ctx.lineWidth = 0.5;
+            const beamWidth = 14; // 波束宽度保持为极窄极细的常数
+
+            ctx.beginPath();
+            ctx.moveTo(0, -beamWidth / 2);
+            ctx.lineTo(distance, -beamWidth / 2);
+            ctx.moveTo(0, beamWidth / 2);
+            ctx.lineTo(distance, beamWidth / 2);
+            ctx.stroke();
+
+            // 2. 绘制高亮荧光红定向窄脉冲包络 (在发射路径上分段滚动推进)
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 1.5;
+            ctx.shadowColor = 'rgba(239, 68, 68, 0.9)';
+            ctx.shadowBlur = 12;
+
+            // 基于正弦函数的动态光点和脉冲
+            const pulseSpeed = 0.35; // 红色脉冲传输速率
+            const segmentCount = 3;  // 同时射出的雷达脉冲个数
+
+            for (let i = 0; i < segmentCount; i++) {
+                // 分割通道，算出当前段的位置
+                const phase = (pulseTime * pulseSpeed + i / segmentCount) % 1.0;
+                const dPos = distance * phase;
+
+                if (dPos < distance) {
+                    // 绘制短促密集的管状窄波束
+                    ctx.beginPath();
+                    ctx.moveTo(dPos, -beamWidth / 3);
+                    ctx.lineTo(Math.min(distance, dPos + 40), -beamWidth / 3);
+                    ctx.moveTo(dPos, beamWidth / 3);
+                    ctx.lineTo(Math.min(distance, dPos + 40), beamWidth / 3);
+                    ctx.stroke();
+
+                    // 绘制脉冲前端填充
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.35)';
+                    ctx.beginPath();
+                    ctx.rect(dPos, -beamWidth/3, Math.min(distance - dPos, 40), (beamWidth*2)/3);
+                    ctx.fill();
+                }
+            }
+
+            // 3. 在目标战机机身上渲染强力电磁波反射点
+            ctx.fillStyle = '#ff3333';
+            ctx.beginPath();
+            ctx.arc(distance, 0, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 反射回波水波纹（红色微波向雷达散回）
+            const echoRadius = (pulseTime * 80) % distance;
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(distance, 0, echoRadius, Math.PI - 0.5, Math.PI + 0.5);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // 绘制科普文字与标识
+        function drawLabels(w, h, tx, ty) {
+            ctx.save();
+            
+            // 统一配置阴影文字
+            ctx.shadowColor = 'rgba(0, 0, 0, 1)';
+            ctx.shadowBlur = 4;
+            
+            // 1. 全向天线侧文字
+            // 黄色背景标牌
+            ctx.fillStyle = '#FFFF00';
+            ctx.fillRect(40, 30, 260, 26);
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(40, 30, 260, 26);
+            
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 13px "Fira Code", monospace';
+            ctx.fillText('广播铁塔：电磁波全向辐射', 52, 47);
+
+            // 2. 定向雷达侧文字
+            // 橙色背景标牌
+            ctx.fillStyle = '#FF6600';
+            ctx.fillRect(w - 300, 30, 260, 26);
+            ctx.strokeRect(w - 300, 30, 260, 26);
+
+            ctx.fillStyle = '#000000';
+            ctx.fillText('雷达天线：电磁波定向窄波束辐射', w - 288, 47);
+
+            // 3. 全向信号特征注释
+            ctx.fillStyle = '#00ff66';
+            ctx.font = '11px "Fira Code", monospace';
+            ctx.fillText('▶ 360° Uniform Field', 40, 80);
+            ctx.fillText('▶ Isotropic Dispersion ($1/R^2$ Decay)', 40, 96);
+            ctx.fillText('▶ No Beam Steering Needed', 40, 112);
+
+            // 4. 定向窄波束扫描参数
+            ctx.fillStyle = '#ef4444';
+            ctx.fillText(`▶ Focused Active Path`, w - 300, 80);
+            ctx.fillText(`▶ Angle (θ): ${Math.atan2(ty - (h - 100), tx - (w - 180)).toFixed(2)} rad`, w - 300, 96);
+            ctx.fillText(`▶ Narrow Pencil Beam Width: ~3.5°`, w - 300, 112);
+
+            // 5. 战机实时探测坐标
+            ctx.fillStyle = '#ffaa00';
+            ctx.fillText(`TARGET LOCKED: [X:${tx.toFixed(0)}, Y:${ty.toFixed(0)}]`, tx - 60, ty - 45);
+
+            ctx.restore();
+        }
+
+        // 交互逻辑绑定 (支持触摸和鼠标操作)
+        function handleInteraction(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = clientX - rect.left;
+            const mouseY = clientY - rect.top;
+
+            // 将屏幕位置归一化为 0-1 之间，使其在画布缩放时依然稳定
+            const logicalW = rect.width;
+            const logicalH = rect.height;
+
+            targetPos.x = mouseX / logicalW;
+            targetPos.y = mouseY / logicalH;
+
+            // 确保拖动和目标范围仅在画布右侧（雷达活动区）
+            if (targetPos.x < 0.5) targetPos.x = 0.5;
+            if (targetPos.x > 0.95) targetPos.x = 0.95;
+            if (targetPos.y < 0.1) targetPos.y = 0.1;
+            if (targetPos.y > 0.8) targetPos.y = 0.8;
+        }
+
+        // 鼠标事件
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            handleInteraction(e.clientX, e.clientY);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                handleInteraction(e.clientX, e.clientY);
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // 触摸屏移动设备兼容
+        canvas.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            if (e.touches[0]) {
+                handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (isDragging && e.touches[0]) {
+                handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        });
+
+        // 控制面板动作
+        document.getElementById('btnPause').addEventListener('click', () => {
+            isRunning = !isRunning;
+            document.getElementById('btnPause').innerText = isRunning ? '暂停动画' : '启动动画';
+            document.getElementById('btnPause').classList.toggle('bg-zinc-800');
+            document.getElementById('btnPause').classList.toggle('bg-emerald-800');
+        });
+
+        document.getElementById('btnGrid').addEventListener('click', () => {
+            showGrid = !showGrid;
+        });
+
+        // 动画主循环
+        function animate(timestamp) {
+            // 计算实时帧率 FPS
+            if (!lastTime) lastTime = timestamp;
+            const elapsed = timestamp - lastTime;
+            frameCount++;
+            if (elapsed >= 1000) {
+                fps = Math.round((frameCount * 1000) / elapsed);
+                fpsDisplay.innerText = `FPS: ${fps}`;
+                frameCount = 0;
+                lastTime = timestamp;
+            }
+
+            // 更新动画时间步长 (若未暂停)
+            if (isRunning) {
+                pulseTime += 0.05;
+            }
+
+            // 获取实时像素宽高和逻辑宽高
+            const sizes = getCanvasSize();
+            const w = sizes.width;
+            const h = sizes.height;
+
+            // 清理画布
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, w, h);
+
+            // 1. 绘制工业风纯黑格栅背景
+            drawEDAGrid(w, h);
+
+            // === A. 左侧：全向辐射广播塔系统 ===
+            const towerX = w * 0.25;
+            const towerY = h * 0.82;
+            const antennaY = towerY - 160; // 信号辐射源高度
+
+            // 绘制全向辐射波纹
+            drawOmniWaves(towerX, antennaY, w * 0.45);
+            // 绘制铁塔实体
+            drawBroadcastTower(towerX, towerY, 1.0);
+
+            // === B. 右侧：定向窄波束雷达系统 ===
+            const radarX = w * 0.75;
+            const radarY = h * 0.82;
+            const targetX = targetPos.x * w;
+            const targetY = targetPos.y * h;
+
+            // 绘制定向发射和接收的窄脉冲
+            drawRadarBeams(radarX, radarY, targetX, targetY);
+            // 绘制雷达碟形反射天线 (自适应指向战机)
+            drawRadarDish(radarX, radarY, targetX, targetY, 1.0);
+            // 绘制侦查空域中的目标战机
+            drawFighterJet(targetX, targetY, 0.9);
+
+            // === C. 顶层文字标识、画幅点缀与微光特效 ===
+            drawLabels(w, h, targetX, targetY);
+
+            // 持续循环
+            requestAnimationFrame(animate);
+        }
+
+        // 初始化运行
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

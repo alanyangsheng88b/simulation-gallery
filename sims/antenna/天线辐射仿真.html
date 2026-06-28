@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天线辐射仿真 — 全向 vs 定向窄波束</title>
+<style>
+  :root {
+    --bg: #000000;
+    --grid: rgba(0, 255, 100, 0.08);
+    --green: #00ff66;
+    --red: #ff3333;
+    --cyan: #00ffff;
+    --orange: #ff6600;
+    --yellow: #ffff00;
+    --panel-bg: rgba(5, 12, 8, 0.92);
+    --border: #003315;
+    --text: #b8c5be;
+    --text-dim: #556655;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Courier New', 'Fira Code', 'SF Mono', monospace, 'Microsoft YaHei';
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 16px;
+    user-select: none;
+    overflow-x: hidden;
+  }
+
+  #app {
+    display: flex;
+    gap: 14px;
+    max-width: 1320px;
+    width: 100%;
+  }
+
+  /* ──── Canvas Area ──── */
+  .canvas-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 700px;
+    aspect-ratio: 4 / 3;
+    background: #000;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 0 60px rgba(0,255,100,0.04), 0 0 30px rgba(0,255,100,0.06);
+  }
+  .canvas-wrap canvas { display: block; width: 100%; height: 100%; }
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 10;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px);
+  }
+  .hud-overlay {
+    position: absolute; bottom: 10px; left: 14px; right: 14px;
+    display: flex; justify-content: space-between; pointer-events: none; z-index: 11;
+    font-size: 10px;
+  }
+  .hud-left { color: var(--green); text-shadow: 0 0 8px rgba(0,255,100,0.6); }
+  .hud-right { color: var(--red); text-shadow: 0 0 8px rgba(255,51,51,0.6); text-align: right; }
+
+  /* ──── Control Panel ──── */
+  .panel {
+    width: 340px;
+    min-width: 340px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    font-size: 0.82rem;
+    box-shadow: 0 0 20px rgba(0,255,100,0.05);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  .panel h2 {
+    font-size: 1.1rem;
+    font-weight: bold;
+    text-align: center;
+    color: var(--green);
+    text-shadow: 0 0 12px rgba(0,255,100,0.5);
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 10px;
+    letter-spacing: 3px;
+  }
+  .ctrl-group { margin-bottom: 4px; }
+  .ctrl-group label {
+    display: flex; justify-content: space-between; margin-bottom: 4px;
+    font-size: 0.78rem;
+  }
+  .ctrl-group label .val { color: var(--cyan); text-shadow: 0 0 6px rgba(0,255,255,0.5); }
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; background: transparent; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track { height: 3px; background: var(--border); }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; height: 16px; width: 7px; background: var(--green);
+    box-shadow: 0 0 10px var(--green); margin-top: -6.5px;
+  }
+
+  .btn {
+    display: block; width: 100%; padding: 10px;
+    background: transparent; border: 1px solid var(--green);
+    color: var(--green); font-family: inherit; font-size: 0.9rem;
+    text-transform: uppercase; letter-spacing: 2px; cursor: pointer;
+    transition: all 0.2s; text-align: center;
+  }
+  .btn:hover { background: var(--green); color: #000; box-shadow: 0 0 18px rgba(0,255,100,0.4); }
+  .btn.red { border-color: var(--red); color: var(--red); }
+  .btn.red:hover { background: var(--red); color: #000; box-shadow: 0 0 18px rgba(255,51,51,0.4); }
+
+  .dashboard {
+    border: 1px solid var(--border); background: rgba(0,0,0,0.4);
+    padding: 12px; font-size: 0.8rem;
+  }
+  .dashboard .row { display: flex; justify-content: space-between; margin: 4px 0; }
+  .dashboard .row .lbl { color: var(--text-dim); }
+  .dashboard .row .num { color: var(--cyan); text-shadow: 0 0 5px rgba(0,255,255,0.4); font-weight: bold; }
+  .dashboard .row .alarm { color: var(--red); text-shadow: 0 0 8px rgba(255,51,51,0.6); }
+  .dashboard hr { border-color: var(--border); margin: 8px 0; }
+  .rmax-box {
+    text-align: center; font-size: 1.2rem; font-weight: bold;
+    padding: 8px; margin-top: 6px;
+    border: 1px dashed var(--cyan); color: var(--cyan);
+    text-shadow: 0 0 8px rgba(0,255,255,0.6);
+  }
+  .formula-box {
+    font-size: 0.7rem; color: var(--text-dim); border-top: 1px dashed var(--border);
+    padding-top: 10px; line-height: 1.6; word-break: break-all;
+  }
+  .formula-box .hi { color: var(--green); }
+  .formula-box .hi2 { color: var(--cyan); }
+  .formula-box .hi3 { color: var(--red); }
+
+  .insight {
+    background: rgba(255,102,0,0.08); border: 1px solid rgba(255,102,0,0.25);
+    padding: 10px 12px; font-size: 0.76rem; line-height: 1.55;
+    color: var(--orange);
+  }
+  .insight strong { color: var(--yellow); }
+
+  @media (max-width: 1100px) {
+    #app { flex-direction: column; align-items: center; }
+    .canvas-wrap { min-width: unset; width: 100%; }
+    .panel { width: 100%; min-width: unset; max-height: unset; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ══════════ Canvas ══════════ -->
+  <div class="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div class="scanlines"></div>
+    <div class="hud-overlay">
+      <span class="hud-left" id="hud-left">[BROADCAST] TX: 150kW · FREQ: 98.7MHz · PATTERN: ISOTROPIC · GAIN: 0 dBi</span>
+      <span class="hud-right" id="hud-right">[RADAR] PEAK: 850kW · FREQ: 10GHz · PATTERN: NARROW_BEAM · GAIN: 35 dBi</span>
+    </div>
+  </div>
+
+  <!-- ══════════ Control Panel ══════════ -->
+  <div class="panel">
+    <h2>▸ SYS.ANTENNA_CONTROL</h2>
+
+    <div class="ctrl-group">
+      <label>发射功率 Pt (kW) <span class="val" id="vPt">1000</span></label>
+      <input type="range" id="iPt" min="50" max="5000" step="50" value="1000">
+    </div>
+    <div class="ctrl-group">
+      <label>天线增益 G (dBi) <span class="val" id="vG">35</span></label>
+      <input type="range" id="iG" min="0" max="55" step="0.5" value="35">
+    </div>
+    <div class="ctrl-group">
+      <label>载波频率 f (GHz) <span class="val" id="vF">10.0</span></label>
+      <input type="range" id="iF" min="0.5" max="20" step="0.5" value="10.0">
+    </div>
+    <div class="ctrl-group">
+      <label>目标截面积 σ (m²) <span class="val" id="vSig">5.0</span></label>
+      <input type="range" id="iSig" min="0.1" max="25" step="0.1" value="5.0">
+    </div>
+    <div class="ctrl-group">
+      <label>全向参考功率 (kW) <span class="val" id="vRef">100</span></label>
+      <input type="range" id="iRef" min="10" max="500" step="10" value="100">
+    </div>
+
+    <button class="btn" id="btnPulse">▶ 发射探测脉冲</button>
+    <button class="btn red" id="btnPause">⏸ 暂停</button>
+
+    <div class="dashboard">
+      <div class="row"><span class="lbl">波长 λ</span><span class="num" id="dLambda">0.0300 m</span></div>
+      <div class="row"><span class="lbl">估计波束宽度 θ_3dB</span><span class="num" id="dBeam">2.8°</span></div>
+      <div class="row"><span class="lbl">目标距离</span><span class="num" id="dDist">-- km</span></div>
+      <hr>
+      <div class="row"><span class="lbl">▸ 理论最大探测距离 R_max</span></div>
+      <div class="rmax-box" id="dRmax">-- km</div>
+      <div class="row" style="margin-top:6px; justify-content:center;">
+        <span class="alarm" id="dAlarm" style="display:none;">⚠ 目标超出探测范围</span>
+        <span id="dDetected" style="color:var(--green);display:none;">✓ 目标在探测范围内</span>
+      </div>
+    </div>
+
+    <div class="insight" id="insightBox">
+      <strong>💡 当前增益下：</strong><br>
+      同等发射功率，定向天线主瓣方向距离是全向天线的 <strong id="iRatio">--</strong>× 倍。
+      <br><br>
+      <strong>如果想让探测距离翻倍：</strong><br>
+      ▸ 仅靠增加功率 → 需 <strong>16×</strong> 功率<br>
+      ▸ 仅靠提升增益 → 需 <strong>4× 增益 (+6 dB)</strong>
+    </div>
+
+    <div class="formula-box">
+      [PHYSICS ENGINE — RADAR EQUATION]<br>
+      R<sub>max</sub> = [<span class="hi">Pt</span>·<span class="hi2">G²</span>·<span class="hi">λ²</span>·<span class="hi">σ</span> / (k·T·Bn·Fn·SNR·(4π)³)]<sup>1/4</sup><br>
+      k = 1.38×10⁻²³, T = 290K, Bn = 1MHz, Fn = 3dB, SNR = 10
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  PHYSICS ENGINE — Full Radar Equation + Dual Antenna Sim
+// ═══════════════════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  // ── Physical Constants ──
+  const C = {
+    c: 299792458,
+    k: 1.380649e-23,
+    T: 290,
+    Bn: 1e6,
+    Fn: 2.0,
+    SNR: 10.0,
+    L: 1.0,
+  };
+
+  // ── Scale: map 200,000m → canvas width (for radar range display) ──
+  const SCALE_BASE = 300000; // meters mapped to canvas width
+
+  // ── Fixed positions (percentage of canvas) ──
+  const TOWER_BASE = { xPct: 0.22, yPct: 0.85 };   // broadcast tower base
+  const ANTENNA_TOP = { xPct: 0.22, yPct: 0.28 };   // broadcast antenna radiating point
+  const RADAR_BASE = { xPct: 0.78, yPct: 0.85 };    // radar dish base
+  const RADAR_PIVOT = { xPct: 0.78, yPct: 0.78 };   // radar rotation pivot
+  const TARGET_PCT = { xPct: 0.60, yPct: 0.22 };     // target (fighter) position
+
+  // ── State ──
+  let state = {
+    Pt_kW: 1000,
+    G_dBi: 35,
+    f_GHz: 10.0,
+    sigma: 5.0,
+    refPow_kW: 100, // omni reference power
+    running: true,
+    pulses: [],
+    pulseTime: 0,
+    time: 0,
+  };
+
+  // Derived physics
+  let phys = {};
+
+  function recomputePhysics() {
+    const Pt = state.Pt_kW * 1000;
+    const G_lin = Math.pow(10, state.G_dBi / 10);
+    const f = state.f_GHz * 1e9;
+    const lambda = C.c / f;
+    const sigma = state.sigma;
+
+    // Beam width: approx formula θ_deg ≈ sqrt(30000 / G_lin)
+    const beamDeg = Math.max(0.8, Math.sqrt(30000 / G_lin));
+    const beamRad = beamDeg * Math.PI / 180;
+
+    // Full radar equation
+    const num = Pt * G_lin * G_lin * lambda * lambda * sigma;
+    const den = C.k * C.T * C.Bn * C.Fn * C.SNR * Math.pow(4 * Math.PI, 3) * C.L;
+    const Rmax = Math.pow(num / den, 0.25);
+
+    // Omni reference: same power, 0 dBi (G=1)
+    const G_omni = 1.0;
+    const numOmni = Pt * G_omni * G_omni * lambda * lambda * sigma;
+    const RmaxOmni = Math.pow(numOmni / den, 0.25);
+
+    // omni with reference power
+    const refP = state.refPow_kW * 1000;
+    const numRef = refP * G_omni * G_omni * lambda * lambda * sigma;
+    const RmaxRef = Math.pow(numRef / den, 0.25);
+
+    phys = {
+      lambda, beamDeg, beamRad,
+      Rmax, RmaxKm: Rmax / 1000,
+      RmaxOmni, RmaxOmniKm: RmaxOmni / 1000,
+      RmaxRef, RmaxRefKm: RmaxRef / 1000,
+      G_lin,
+    };
+  }
+
+  // ── Canvas setup ──
+  function getSize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = rect.width;
+    const h = rect.height;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w, h };
+  }
+
+  function pos(pct, w, h) {
+    return { x: pct.xPct * w, y: pct.yPct * h };
+  }
+
+  function scaleMeterToPx(w) { return w / SCALE_BASE; }
+
+  // ── Drawing: EDA Grid ──
+  function drawGrid(w, h) {
+    ctx.strokeStyle = 'rgba(0,255,100,0.06)';
+    ctx.lineWidth = 0.5;
+    const step = 40;
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += step) { ctx.moveTo(x,0); ctx.lineTo(x,h); }
+    for (let y = 0; y <= h; y += step) { ctx.moveTo(0,y); ctx.lineTo(w,y); }
+    ctx.stroke();
+
+    // Distance circles from radar (every 50km)
+    const rp = pos(RADAR_PIVOT, w, h);
+    const s2m = SCALE_BASE / w; // meters per px
+    ctx.strokeStyle = 'rgba(0,255,100,0.04)';
+    ctx.setLineDash([4,6]);
+    for (let d = 50000; d <= 300000; d += 50000) {
+      ctx.beginPath();
+      ctx.arc(rp.x, rp.y, d / s2m, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // ── Drawing: Broadcast Tower ──
+  function drawTower(base, top, w, h) {
+    const scale = Math.min(w, h) / 750;
+    ctx.save();
+    ctx.strokeStyle = '#00ff66';
+    ctx.lineWidth = 1.0;
+    ctx.shadowColor = 'rgba(0,255,100,0.35)';
+    ctx.shadowBlur = 4;
+
+    const bx = base.x, by = base.y;
+    const tx = top.x, ty = top.y;
+    const towerH = by - ty;
+
+    // Base platform
+    ctx.fillStyle = '#0a1a10';
+    ctx.fillRect(bx - 28*scale, by, 56*scale, 7*scale);
+    ctx.strokeRect(bx - 28*scale, by, 56*scale, 7*scale);
+
+    // Main A-frame
+    ctx.beginPath();
+    ctx.moveTo(bx - 20*scale, by);
+    ctx.lineTo(bx - 2*scale, ty);
+    ctx.lineTo(bx + 2*scale, ty);
+    ctx.lineTo(bx + 20*scale, by);
+    ctx.stroke();
+
+    // Top pole / whip antenna
+    ctx.beginPath();
+    ctx.moveTo(bx, ty);
+    ctx.lineTo(bx, ty - 25*scale);
+    ctx.stroke();
+
+    // Radiating sphere
+    const antY = ty - 25*scale;
+    ctx.fillStyle = '#00ff66';
+    ctx.shadowColor = 'rgba(0,255,100,0.8)';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(bx, antY, 4*scale, 0, Math.PI*2);
+    ctx.fill();
+
+    // Cross braces (A-frame ladder)
+    const sections = 4;
+    for (let i = 0; i <= sections; i++) {
+      const ratio = i / sections;
+      const hy = by - towerH * ratio;
+      const hw = 20*scale * (1-ratio) + 2*scale * ratio;
+      if (i > 0 && i <= sections) {
+        ctx.beginPath();
+        ctx.moveTo(bx - hw, hy);
+        ctx.lineTo(bx + hw, hy);
+        ctx.stroke();
+      }
+    }
+    // Diagonal crosses
+    for (let i = 0; i < sections; i++) {
+      const r1 = i/sections, r2 = (i+1)/sections;
+      const hy1 = by - towerH*r1, hy2 = by - towerH*r2;
+      const hw1 = 20*scale*(1-r1) + 2*scale*r1;
+      const hw2 = 20*scale*(1-r2) + 2*scale*r2;
+      ctx.beginPath();
+      ctx.moveTo(bx-hw1, hy1); ctx.lineTo(bx+hw2, hy2);
+      ctx.moveTo(bx+hw1, hy1); ctx.lineTo(bx-hw2, hy2);
+      ctx.stroke();
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    return { x: bx, y: antY }; // radiating center
+  }
+
+  // ── Drawing: Radar Dish ──
+  function drawRadar(base, pivot, targetPx, w, h) {
+    const scale = Math.min(w, h) / 750;
+    ctx.save();
+
+    const dx = targetPx.x - pivot.x;
+    const dy = targetPx.y - pivot.y;
+    const angle = Math.atan2(dy, dx);
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.0;
+    ctx.shadowColor = 'rgba(56,189,248,0.35)';
+    ctx.shadowBlur = 4;
+
+    // Base
+    ctx.fillStyle = '#081420';
+    ctx.beginPath();
+    ctx.ellipse(base.x, base.y + 22*scale, 30*scale, 8*scale, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Pedestal
+    ctx.beginPath();
+    ctx.moveTo(base.x - 13*scale, base.y + 22*scale);
+    ctx.lineTo(base.x - 4*scale, pivot.y);
+    ctx.lineTo(base.x + 4*scale, pivot.y);
+    ctx.lineTo(base.x + 13*scale, base.y + 22*scale);
+    ctx.stroke();
+
+    // Rotate to target
+    ctx.translate(pivot.x, pivot.y);
+    ctx.rotate(angle);
+
+    // Pivot joint
+    ctx.fillStyle = '#0d1f33';
+    ctx.beginPath();
+    ctx.arc(0, 0, 10*scale, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Dish reflector
+    ctx.beginPath();
+    ctx.arc(-4*scale, 0, 28*scale, -Math.PI/2.3, Math.PI/2.3);
+    ctx.stroke();
+
+    // Dish backbone
+    ctx.beginPath();
+    ctx.moveTo(-28*scale, 0);
+    ctx.lineTo(-4*scale, 0);
+    ctx.stroke();
+
+    // Feed support arms
+    ctx.strokeStyle = 'rgba(56,189,248,0.5)';
+    ctx.beginPath();
+    ctx.moveTo(-13*scale, -22*scale);
+    ctx.lineTo(22*scale, 0);
+    ctx.moveTo(-13*scale, 22*scale);
+    ctx.lineTo(22*scale, 0);
+    ctx.stroke();
+
+    // Feed horn
+    ctx.fillStyle = '#38bdf8';
+    ctx.shadowColor = 'rgba(56,189,248,0.6)';
+    ctx.beginPath();
+    ctx.rect(18*scale, -5*scale, 7*scale, 10*scale);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // ── Drawing: Fighter Jet ──
+  function drawFighter(x, y, angle, isDetected, w, h) {
+    const scale = Math.min(w, h) / 900;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle + Math.PI/5);
+
+    const detected = isDetected;
+    ctx.fillStyle = detected ? '#ff3333' : '#440000';
+    ctx.strokeStyle = detected ? '#ff3333' : '#550000';
+    ctx.lineWidth = 1.2;
+    ctx.shadowBlur = detected ? 10 : 2;
+    ctx.shadowColor = detected ? 'rgba(255,51,51,0.7)' : 'rgba(80,0,0,0.5)';
+
+    ctx.beginPath();
+    ctx.moveTo(0, -32*scale);
+    ctx.lineTo(4*scale, -14*scale);
+    ctx.lineTo(11*scale, -11*scale);
+    ctx.lineTo(4*scale, -7*scale);
+    ctx.lineTo(5*scale, 9*scale);
+    ctx.lineTo(30*scale, 18*scale);
+    ctx.lineTo(5*scale, 13*scale);
+    ctx.lineTo(4*scale, 25*scale);
+    ctx.lineTo(9*scale, 31*scale);
+    ctx.lineTo(0, 28*scale);
+    ctx.lineTo(-9*scale, 31*scale);
+    ctx.lineTo(-4*scale, 25*scale);
+    ctx.lineTo(-5*scale, 13*scale);
+    ctx.lineTo(-30*scale, 18*scale);
+    ctx.lineTo(-5*scale, 9*scale);
+    ctx.lineTo(-4*scale, -7*scale);
+    ctx.lineTo(-11*scale, -11*scale);
+    ctx.lineTo(-4*scale, -14*scale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Cockpit
+    ctx.fillStyle = detected ? 'rgba(255,51,51,0.5)' : 'rgba(100,0,0,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(0, -7*scale, 2.2*scale, 7*scale, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // RCS visual
+    if (detected) {
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.sqrt(state.sigma)*1.2, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fill();
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // ── Drawing: Omni waves ──
+  function drawOmniWaves(cx, cy, maxR_px, t) {
+    ctx.save();
+    const waveSpacing = 55;
+    const speed = 1.5;
+    const offset = (t * speed) % waveSpacing;
+
+    for (let r = offset; r < maxR_px; r += waveSpacing) {
+      if (r < 4) continue;
+      const alpha = Math.max(0, 0.85 * (1 - r / maxR_px));
+      ctx.strokeStyle = `rgba(0,255,100,${alpha})`;
+      ctx.lineWidth = 1.8 * alpha + 0.4;
+      ctx.shadowColor = `rgba(0,255,100,${alpha*0.7})`;
+      ctx.shadowBlur = 7 * alpha;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // ── Drawing: Directional beam pulses ──
+  function drawBeamPulses(rp, tp, beamRad, angle, w) {
+    ctx.save();
+    const dx = tp.x - rp.x;
+    const dy = tp.y - rp.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const s2m = SCALE_BASE / w; // m per px
+    const rmaxPx = phys.Rmax / s2m;
+
+    // ── Rmax boundary sector ──
+    const rmaxVis = Math.min(rmaxPx, dist * 2.5);
+    ctx.beginPath();
+    ctx.moveTo(rp.x, rp.y);
+    ctx.arc(rp.x, rp.y, rmaxVis, angle - beamRad/2, angle + beamRad/2);
+    ctx.closePath();
+    const grad = ctx.createRadialGradient(rp.x, rp.y, 0, rp.x, rp.y, rmaxVis);
+    grad.addColorStop(0, 'rgba(0,255,255,0.12)');
+    grad.addColorStop(0.5, 'rgba(0,255,255,0.04)');
+    grad.addColorStop(1, 'rgba(0,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,255,255,0.25)';
+    ctx.setLineDash([5,6]);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Beam boundary lines
+    ctx.strokeStyle = 'rgba(255,51,51,0.12)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(rp.x, rp.y);
+    ctx.lineTo(rp.x + Math.cos(angle - beamRad/2) * dist * 1.5, rp.y + Math.sin(angle - beamRad/2) * dist * 1.5);
+    ctx.moveTo(rp.x, rp.y);
+    ctx.lineTo(rp.x + Math.cos(angle + beamRad/2) * dist * 1.5, rp.y + Math.sin(angle + beamRad/2) * dist * 1.5);
+    ctx.stroke();
+
+    // ── Active pulses ──
+    for (const p of state.pulses) {
+      if (!p.active) continue;
+      const rr = p.r * dist; // fraction * full distance
+      if (p.type === 'tx') {
+        // Forward pulse arc
+        ctx.beginPath();
+        ctx.arc(rp.x, rp.y, rr, angle - beamRad/2, angle + beamRad/2);
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 2.5;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00ffff';
+        ctx.stroke();
+
+        // Inner fill
+        ctx.fillStyle = 'rgba(0,255,255,0.06)';
+        ctx.fill();
+      } else {
+        // Return echo (spherical from target)
+        ctx.beginPath();
+        ctx.arc(tp.x, tp.y, rr, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(255,51,51,0.7)';
+        ctx.lineWidth = 1.6;
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = '#ff3333';
+        ctx.stroke();
+      }
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // ── Drawing: Labels & Annotations ──
+  function drawLabels(w, h, towerCtr, radarP, targetP, isDetected) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,1)';
+    ctx.shadowBlur = 3;
+
+    // Broadcast label
+    const lw = 260;
+    ctx.fillStyle = '#ffff00';
+    ctx.fillRect(30, 20, lw, 24);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(30, 20, lw, 24);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 12px "Courier New", monospace';
+    ctx.fillText('广播铁塔：全向辐射 (Omni)', 42, 37);
+
+    // Radar label
+    ctx.fillStyle = '#ff6600';
+    ctx.fillRect(w - 30 - lw, 20, lw, 24);
+    ctx.strokeRect(w - 30 - lw, 20, lw, 24);
+    ctx.fillStyle = '#000';
+    ctx.fillText('雷达天线：定向窄波束 (Directional)', w - 18 - lw, 37);
+
+    // Omni annotations
+    ctx.fillStyle = '#00ff66';
+    ctx.font = '10px "Courier New", monospace';
+    ctx.shadowBlur = 1;
+    ctx.fillText('▶ 360° 均匀覆盖', 30, 62);
+    ctx.fillText('▶ 能量按 1/R² 扩散衰减', 30, 76);
+    ctx.fillText('▶ 无需波束对准', 30, 90);
+
+    // Radar annotations
+    ctx.fillStyle = '#ff3333';
+    ctx.fillText(`▶ 主瓣波束宽度: ${phys.beamDeg.toFixed(1)}°`, w - 30 - lw, 62);
+    ctx.fillText(`▶ 方位角: ${(Math.atan2(targetP.y - radarP.y, targetP.x - radarP.x)*180/Math.PI).toFixed(1)}°`, w - 30 - lw, 76);
+    ctx.fillText(`▶ 增益: ${state.G_dBi.toFixed(1)} dBi`, w - 30 - lw, 90);
+
+    // Target label
+    if (isDetected) {
+      ctx.fillStyle = '#ffaa00';
+      ctx.font = 'bold 11px "Courier New", monospace';
+      ctx.fillText('TARGET LOCKED', targetP.x + 20, targetP.y - 20);
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // ── Main Render ──
+  function render(ts) {
+    if (!state.running) { requestAnimationFrame(render); return; }
+
+    state.time = ts * 0.001;
+    const { w, h } = getSize();
+    const s2m = SCALE_BASE / w;
+
+    // Positions
+    const twrBase = pos(TOWER_BASE, w, h);
+    const twrAnt = pos(ANTENNA_TOP, w, h);
+    const radBase = pos(RADAR_BASE, w, h);
+    const radPiv = pos(RADAR_PIVOT, w, h);
+    const tgt = pos(TARGET_PCT, w, h);
+
+    // Distance radar→target
+    const tgtDistPx = Math.sqrt((tgt.x - radPiv.x)**2 + (tgt.y - radPiv.y)**2);
+    const tgtDistM = tgtDistPx * s2m;
+    const tgtAngle = Math.atan2(tgt.y - radPiv.y, tgt.x - radPiv.x);
+    const isDetected = phys.Rmax >= tgtDistM;
+
+    // Omni wave max radius
+    const refOmniRmaxPx = phys.RmaxRef / s2m;
+
+    // Clear
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid
+    drawGrid(w, h);
+
+    // ── LEFT: Omnidirectional ──
+    const antCtr = drawTower(twrBase, twrAnt, w, h);
+    drawOmniWaves(antCtr.x, antCtr.y, Math.min(refOmniRmaxPx, w*0.38), state.time);
+
+    // Omni range ring
+    ctx.setLineDash([3,5]);
+    ctx.strokeStyle = 'rgba(0,255,100,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(antCtr.x, antCtr.y, refOmniRmaxPx, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ── RIGHT: Directional ──
+    drawBeamPulses(radPiv, tgt, phys.beamRad, tgtAngle, w);
+    drawRadar(radBase, radPiv, tgt, w, h);
+    drawFighter(tgt.x, tgt.y, tgtAngle, isDetected, w, h);
+
+    // Range comparison overlay — same physical scale
+    const rmaxPx = phys.Rmax / s2m;
+    if (rmaxPx < w * 2) {
+      ctx.strokeStyle = 'rgba(0,255,255,0.2)';
+      ctx.setLineDash([2,6]);
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.arc(radPiv.x, radPiv.y, rmaxPx, tgtAngle - phys.beamRad/2, tgtAngle + phys.beamRad/2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Label Rmax
+      ctx.fillStyle = 'rgba(0,255,255,0.5)';
+      ctx.font = '9px "Courier New", monospace';
+      const lx = radPiv.x + Math.cos(tgtAngle) * rmaxPx * 0.7;
+      const ly = radPiv.y + Math.sin(tgtAngle) * rmaxPx * 0.7;
+      ctx.fillText(`Rmax = ${phys.RmaxKm.toFixed(1)} km`, lx, ly - 5);
+    }
+
+    // Labels
+    drawLabels(w, h, antCtr, radPiv, tgt, isDetected);
+
+    // Axis scale text
+    ctx.fillStyle = 'rgba(0,255,100,0.35)';
+    ctx.font = '9px "Courier New", monospace';
+    ctx.fillText('0 km', radPiv.x - 15, radPiv.y + 15);
+    ctx.fillText(`${SCALE_BASE/1000} km →`, w - 80, h - 12);
+
+    // ── Update pulses ──
+    for (let i = state.pulses.length - 1; i >= 0; i--) {
+      const p = state.pulses[i];
+      if (!p.active) continue;
+      p.r += p.speed;
+
+      if (p.type === 'tx') {
+        if (p.r >= 1.0) {
+          p.active = false;
+          // Generate return echo if detected
+          if (isDetected && !p.bounced) {
+            p.bounced = true;
+            state.pulses.push({ type: 'rx', r: 0, speed: p.speed, active: true });
+          }
+        }
+      } else if (p.type === 'rx') {
+        if (p.r >= 1.0) {
+          p.active = false;
+          // Flash feedback
+          document.getElementById('c').parentElement.style.borderColor = '#ff3333';
+          setTimeout(() => {
+            document.getElementById('c').parentElement.style.borderColor = '#003315';
+          }, 120);
+        }
+      }
+    }
+    state.pulses = state.pulses.filter(p => p.active);
+
+    // ── Update HUD ──
+    document.getElementById('hud-left').innerHTML =
+      `[BROADCAST] TX: ${state.refPow_kW}kW · FREQ: 98.7MHz · PATTERN: ISOTROPIC · Rmax: ${phys.RmaxRefKm.toFixed(1)}km`;
+    document.getElementById('hud-right').innerHTML =
+      `[RADAR] PEAK: ${state.Pt_kW}kW · FREQ: ${state.f_GHz.toFixed(1)}GHz · BEAM: ${phys.beamDeg.toFixed(1)}° · Rmax: ${phys.RmaxKm.toFixed(1)}km`;
+
+    // ── Update Dashboard ──
+    document.getElementById('dLambda').textContent = phys.lambda.toFixed(4) + ' m';
+    document.getElementById('dBeam').textContent = phys.beamDeg.toFixed(1) + '°';
+    document.getElementById('dDist').textContent = (tgtDistM/1000).toFixed(1) + ' km';
+    document.getElementById('dRmax').textContent = phys.RmaxKm.toFixed(1) + ' km';
+    document.getElementById('dRmax').style.color = isDetected ? 'var(--cyan)' : 'var(--red)';
+    document.getElementById('dAlarm').style.display = isDetected ? 'none' : 'block';
+    document.getElementById('dDetected').style.display = isDetected ? 'block' : 'none';
+
+    // Range ratio
+    const ratio = phys.Rmax / phys.RmaxRef;
+    document.getElementById('iRatio').textContent = ratio.toFixed(1);
+
+    requestAnimationFrame(render);
+  }
+
+  // ── UI Events ──
+  function bindSlider(id, key, fmt, cb) {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => {
+      const val = parseFloat(el.value);
+      state[key] = val;
+      document.getElementById('v'+key.slice(0,1).toUpperCase()+key.slice(1).replace('_kW','').replace('_GHz','').replace('_dBi','')).textContent = fmt ? val.toFixed(fmt) : val;
+      recomputePhysics();
+      // Keep display updated
+      updateDisplayVals();
+    });
+  }
+  function updateDisplayVals() {
+    document.getElementById('vPt').textContent = state.Pt_kW;
+    document.getElementById('vG').textContent = state.G_dBi.toFixed(1);
+    document.getElementById('vF').textContent = state.f_GHz.toFixed(1);
+    document.getElementById('vSig').textContent = state.sigma.toFixed(1);
+    document.getElementById('vRef').textContent = state.refPow_kW;
+  }
+
+  bindSlider('iPt', 'Pt_kW', 0);
+  bindSlider('iG', 'G_dBi', 1);
+  bindSlider('iF', 'f_GHz', 1);
+  bindSlider('iSig', 'sigma', 1);
+  bindSlider('iRef', 'refPow_kW', 0);
+
+  document.getElementById('btnPulse').addEventListener('click', () => {
+    recomputePhysics();
+    state.pulses.push({
+      type: 'tx', r: 0, speed: 0.012, active: true, bounced: false,
+    });
+  });
+
+  document.getElementById('btnPause').addEventListener('click', function() {
+    state.running = !state.running;
+    this.textContent = state.running ? '⏸ 暂停' : '▶ 继续';
+    this.classList.toggle('red', !state.running);
+    if (state.running) requestAnimationFrame(render);
+  });
+
+  // Mouse drag target
+  let dragging = false;
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const tgt = pos(TARGET_PCT, rect.width, rect.height);
+    const dist = Math.hypot(mx - tgt.x, my - tgt.y);
+    if (dist < 40) dragging = true;
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    TARGET_PCT.xPct = Math.max(0.45, Math.min(0.92, (e.clientX - rect.left) / rect.width));
+    TARGET_PCT.yPct = Math.max(0.08, Math.min(0.75, (e.clientY - rect.top) / rect.height));
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+
+  // Touch support
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches[0]) {
+      const rect = canvas.getBoundingClientRect();
+      TARGET_PCT.xPct = Math.max(0.45, Math.min(0.92, (e.touches[0].clientX - rect.left) / rect.width));
+      TARGET_PCT.yPct = Math.max(0.08, Math.min(0.75, (e.touches[0].clientY - rect.top) / rect.height));
+    }
+  });
+
+  // Resize
+  window.addEventListener('resize', () => {
+    canvas.width = 0; // force resize on next getSize()
+  });
+
+  // ── Init ──
+  recomputePhysics();
+  updateDisplayVals();
+  requestAnimationFrame(render);
+
+})();
+</script>
+</body>
+</html>
