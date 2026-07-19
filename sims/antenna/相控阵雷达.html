@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>相控阵天线波束赋形仿真</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 保持Canvas渲染清晰的CSS设置 */
+        #simCanvas {
+            image-rendering: pixelated;
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.25rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen p-4 md:p-8">
+
+<div class="max-w-5xl mx-auto space-y-6">
+    <header class="border-b pb-4">
+        <h1 class="text-3xl font-bold text-gray-900 hover:bg-gray-100 px-2 rounded cursor-text outline-none focus:ring-2 focus:ring-blue-500 transition-colors inline-block" contenteditable="true" title="点击直接修改标题">相控阵天线波束赋形原理 (Phased Array Beamsteering)</h1>
+        <p class="text-gray-600 mt-2">基于惠更斯-菲涅尔原理的瞬时电磁场干涉叠加与阵列因子可视化。严格遵循等幅线阵物理模型。</p>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 仿真画布区域 -->
+        <div class="lg:col-span-2 flex flex-col items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+            <!-- 实际渲染分辨率设为400x200，CSS放大以平衡性能与视觉 -->
+            <canvas id="simCanvas" width="400" height="200" class="bg-black cursor-crosshair"></canvas>
+            
+            <div class="w-full flex justify-between items-center mt-4 px-2">
+                <button id="togglePlay" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors">
+                    ⏸ 暂停动画 (Pause)
+                </button>
+                <div class="text-sm text-gray-500 text-right">
+                    主波束理论偏转角: <span id="theoreticalAngle" class="font-mono font-bold text-blue-600">0.0°</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 参数控制面板 -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-6">
+            <h2 class="text-xl font-semibold border-b pb-2">工程参数控制</h2>
+            
+            <!-- 天线数量 -->
+            <div>
+                <div class="slider-label">
+                    <span>阵元数量 (N)</span>
+                    <span id="valN" class="font-mono">8</span>
+                </div>
+                <input type="range" id="paramN" min="2" max="16" step="1" value="8" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                <p class="text-xs text-gray-500 mt-1">影响波束宽度，数量越多波束越窄。</p>
+            </div>
+
+            <!-- 天线间距 -->
+            <div>
+                <div class="slider-label">
+                    <span>阵元间距 (d)</span>
+                    <span id="valD" class="font-mono">0.50 λ</span>
+                </div>
+                <input type="range" id="paramD" min="0.1" max="1.5" step="0.05" value="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                <p class="text-xs text-gray-500 mt-1">典型值为 0.5λ (半波长)。超过 0.5λ 可能产生栅瓣 (Grating Lobes)。</p>
+            </div>
+
+            <!-- 相位差 -->
+            <div>
+                <div class="slider-label">
+                    <span>相对相位差 (δ)</span>
+                    <span id="valPhase" class="font-mono">60°</span>
+                </div>
+                <input type="range" id="paramPhase" min="-180" max="180" step="1" value="60" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            <p class="text-xs text-gray-500 mt-1">相邻天线的电信号相位差。改变此值以扫描波束。</p>
+        </div>
+
+        <!-- 画布分辨率 (尺寸) -->
+        <div>
+            <div class="slider-label">
+                <span>内部渲染分辨率 (宽度)</span>
+                <span id="valRes" class="font-mono">400 px</span>
+            </div>
+            <input type="range" id="paramRes" min="200" max="1000" step="50" value="400" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            <p class="text-xs text-gray-500 mt-1">控制仿真计算的网格密度与精度。</p>
+        </div>
+
+        <!-- 空间尺度 (近场/远场) -->
+        <div>
+            <div class="slider-label">
+                <span>观测范围 (空间尺度)</span>
+                <span id="valScale" class="font-mono">20 px/λ</span>
+            </div>
+            <input type="range" id="paramScale" min="2" max="100" step="1" value="20" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            <p class="text-xs text-gray-500 mt-1">数值越小观测视场越大(远场)，数值越大观测细节越近(近场)。</p>
+        </div>
+
+        <!-- 显示亮度 -->
+        <div>
+            <div class="slider-label">
+                <span>场强显示增益 (亮度)</span>
+                <span id="valGain" class="font-mono">1.0 x</span>
+            </div>
+            <input type="range" id="paramGain" min="0.1" max="5.0" step="0.1" value="1.0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            <p class="text-xs text-gray-500 mt-1">调节波场干涉图样的显示对比度与亮度。</p>
+        </div>
+
+        <!-- 物理公式反馈 -->
+        <div class="bg-gray-50 p-3 rounded text-sm font-mono text-gray-700 border">
+            <div>θ_m = arcsin( -δ / (k·d) )</div>
+                <div id="formulaStatus" class="mt-2 text-green-600">公式状态：正常</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    /**
+     * 严谨工程师的代码规范：
+     * 1. 统一正演相位公约：E = E0 * exp(j(wt - kr + phi))
+     * 2. 引入极坐标系网格渲染，确保 Array Factor Envelope 与相长干涉物理边界重合。
+     * 3. 色图(Colormap)采用类Jet映射，直观反映波的波峰与波谷状态。
+     */
+
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false }); // 禁用alpha通道提升渲染性能
+    
+    // 物理及仿真配置参数
+    const config = {
+        lambda: 20,         // 波长对应的像素数 (空间尺度基准)
+        N: 8,               // 阵元数量
+        d_lambda: 0.5,      // 阵元间距 (以波长为单位)
+        phaseDeg: 60,       // 相位差 (度) - 默认设定为60与例图匹配
+        omega: 0.2,         // 角频率 (控制动画速度)
+        isPlaying: true,
+        time: 0,
+        gain: 1.0           // 显示增益
+    };
+
+    // DOM 元素引用
+    const paramN = document.getElementById('paramN');
+    const paramD = document.getElementById('paramD');
+    const paramPhase = document.getElementById('paramPhase');
+    const paramRes = document.getElementById('paramRes');
+    const paramScale = document.getElementById('paramScale');
+    const paramGain = document.getElementById('paramGain');
+    const togglePlay = document.getElementById('togglePlay');
+    const theoreticalAngle = document.getElementById('theoreticalAngle');
+    const formulaStatus = document.getElementById('formulaStatus');
+
+    // 核心物理渲染引擎数据缓冲 (支持动态调整尺寸)
+    let imgData = ctx.createImageData(canvas.width, canvas.height);
+    let data = imgData.data;
+
+    // 事件监听与参数绑定
+    function updateParams() {
+        config.N = parseInt(paramN.value);
+        config.d_lambda = parseFloat(paramD.value);
+        config.phaseDeg = parseFloat(paramPhase.value);
+        config.lambda = parseFloat(paramScale.value);
+        config.gain = parseFloat(paramGain.value);
+        
+        // 动态重构画布分辨率
+        const newRes = parseInt(paramRes.value);
+        if (canvas.width !== newRes) {
+            canvas.width = newRes;
+            canvas.height = Math.floor(newRes / 2); // 保持2:1几何比例
+            imgData = ctx.createImageData(canvas.width, canvas.height);
+            data = imgData.data;
+        }
+
+        document.getElementById('valN').innerText = config.N;
+        document.getElementById('valD').innerText = config.d_lambda.toFixed(2) + ' λ';
+        document.getElementById('valPhase').innerText = config.phaseDeg + '°';
+        document.getElementById('valRes').innerText = canvas.width + ' px';
+        document.getElementById('valScale').innerText = config.lambda + ' px/λ';
+        document.getElementById('valGain').innerText = config.gain.toFixed(1) + ' x';
+
+        calculateTheory();
+    }
+
+    paramN.addEventListener('input', updateParams);
+    paramD.addEventListener('input', updateParams);
+    paramPhase.addEventListener('input', updateParams);
+    paramRes.addEventListener('input', updateParams);
+    paramScale.addEventListener('input', updateParams);
+    paramGain.addEventListener('input', updateParams);
+    
+    togglePlay.addEventListener('click', () => {
+        config.isPlaying = !config.isPlaying;
+        togglePlay.innerText = config.isPlaying ? "⏸ 暂停动画 (Pause)" : "▶️ 播放动画 (Play)";
+        togglePlay.classList.toggle('bg-blue-600', config.isPlaying);
+        togglePlay.classList.toggle('bg-gray-600', !config.isPlaying);
+    });
+
+    // 计算理论偏转角
+    function calculateTheory() {
+        const delta_rad = config.phaseDeg * Math.PI / 180;
+        const kd = 2 * Math.PI * config.d_lambda;
+        const sinTheta = -delta_rad / kd;
+        
+        if (Math.abs(sinTheta) > 1) {
+            theoreticalAngle.innerText = "N/A (隐失波区域)";
+            formulaStatus.innerText = "警告：要求的相位差超出了物理可偏转范围 (|sinθ| > 1)。出现无功场。";
+            formulaStatus.className = "mt-2 text-red-600";
+        } else {
+            const theta_deg = Math.asin(sinTheta) * 180 / Math.PI;
+            theoreticalAngle.innerText = theta_deg.toFixed(1) + '°';
+            formulaStatus.innerText = "状态：主波束正常辐射";
+            formulaStatus.className = "mt-2 text-green-600";
+        }
+    }
+
+    // 高效的 Jet 色图算法 (归一化值 0 到 1)
+    function jetColor(v) {
+        let r = Math.max(0, Math.min(1, 1.5 - Math.abs(1 - 4 * (v - 0.75))));
+        let g = Math.max(0, Math.min(1, 1.5 - Math.abs(1 - 4 * (v - 0.5))));
+        let b = Math.max(0, Math.min(1, 1.5 - Math.abs(1 - 4 * (v - 0.25))));
+        return [r * 255, g * 255, b * 255];
+    }
+
+    // 主渲染循环
+    function render() {
+        if (config.isPlaying) {
+            config.time += config.omega;
+        }
+
+        const N = config.N;
+        const k = 2 * Math.PI / config.lambda;
+        const d_pixels = config.d_lambda * config.lambda;
+        const phase_rad = config.phaseDeg * Math.PI / 180;
+        
+        // 使用动态的 canvas.width 和 canvas.height
+        const w = canvas.width;
+        const h = canvas.height;
+        
+        // 预计算天线位置 (以画布底部中心为原点)
+        const antennasX = new Float32Array(N);
+        const antennasPhase = new Float32Array(N);
+        const originX = w / 2;
+        const originY = h; // 画布底边
+        
+        for (let i = 0; i < N; i++) {
+            // 对称分布
+            antennasX[i] = (i - (N - 1) / 2) * d_pixels;
+            antennasPhase[i] = i * phase_rad;
+        }
+
+        // 遍历所有像素计算波场叠加
+        let pixelIndex = 0;
+        // 振幅归一化系数，使得最大幅值为1左右。
+        const maxAmp = N; 
+        
+        for (let y = 0; y < h; y++) {
+            const dy = originY - y; // 物理Y坐标
+            for (let x = 0; x < w; x++) {
+                const dx = x - originX; // 物理X坐标
+                
+                let field = 0;
+                // 叠加每个天线的场
+                for (let i = 0; i < N; i++) {
+                    const adx = dx - antennasX[i];
+                    const r = Math.sqrt(adx * adx + dy * dy);
+                    // 修正后的波函数公约: cos(wt - kr + phi)
+                    // 确保物理波束偏转角度与 Array Factor 理论推导的符号保持一致
+                    field += Math.cos(config.time - k * r + antennasPhase[i]);
+                }
+                
+                // 映射场强到色图：引入亮度增益 config.gain
+                let normVal = ((field * config.gain) / maxAmp + 1) / 2; 
+                // 限制在 0-1 之间，防止意外溢出
+                normVal = Math.max(0, Math.min(1, normVal));
+                
+                const [rVal, gVal, bVal] = jetColor(normVal);
+                
+                data[pixelIndex++] = rVal;
+                data[pixelIndex++] = gVal;
+                data[pixelIndex++] = bVal;
+                data[pixelIndex++] = 255; // Alpha
+            }
+        }
+        
+        // 将像素数据推送到 Canvas
+        ctx.putImageData(imgData, 0, 0);
+
+        // 绘制天线阵元、极坐标网格及阵列因子(辐射方向图)
+        drawOverlays(originX, originY, N, antennasX, k, config.d_lambda, phase_rad, h);
+
+        requestAnimationFrame(render);
+    }
+
+    function drawOverlays(ox, oy, N, antennasX, k, d_lambda, phase_rad, h) {
+        // 画布高度 h 代表了归一化最远边界 (半径为1.0)
+        const scale = h; 
+        
+        // ==========================================
+        // 1. 绘制极坐标网格 (Normalized Polar Grid)
+        // ==========================================
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)'; // 网格线颜色
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';    // 文本颜色
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+
+        // 绘制半圆刻度 (0.2, 0.4, 0.6, 0.8, 1.0)
+        const ticks = [0.2, 0.4, 0.6, 0.8, 1.0];
+        for (let r_norm of ticks) {
+            const r = r_norm * scale;
+            ctx.beginPath();
+            ctx.arc(ox, oy, r, Math.PI, 0);
+            ctx.stroke();
+            
+            // 绘制刻度标签
+            if (r_norm === 1.0) {
+                ctx.fillText('1', ox + 4, oy - r - 2);
+            } else {
+                ctx.fillText(r_norm.toString(), ox + 4, oy - r - 2);
+            }
+        }
+
+        // 绘制放射状角度辅助线
+        const angles = [-60, -30, 0, 30, 60];
+        for (let angleDeg of angles) {
+            const theta = angleDeg * Math.PI / 180;
+            ctx.beginPath();
+            ctx.moveTo(ox, oy);
+            ctx.lineTo(ox + scale * Math.sin(theta), oy - scale * Math.cos(theta));
+            ctx.stroke();
+        }
+
+        // ==========================================
+        // 2. 绘制极坐标辐射方向图 (Array Factor Envelope)
+        // ==========================================
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)'; // 更黑更粗的包络线
+        ctx.lineWidth = 1.8;
+        
+        const kd = 2 * Math.PI * d_lambda;
+        
+        // 扫描从 -90度 到 +90度
+        for (let angleDeg = -90; angleDeg <= 90; angleDeg += 0.5) {
+            const theta = angleDeg * Math.PI / 180;
+            // 计算 psi = k*d*sin(theta) + delta
+            const psi = kd * Math.sin(theta) + phase_rad;
+            
+            // 计算阵列因子 |AF| = | sin(N*psi/2) / (N * sin(psi/2)) |
+            let AF = 1; // psi=0时的极限
+            if (Math.abs(psi) > 1e-6) {
+                AF = Math.abs(Math.sin(N * psi / 2) / (N * Math.sin(psi / 2)));
+            }
+            
+            // 极坐标转直角坐标 (theta是偏离Y轴的角度，映射至屏幕坐标系)
+            // r 的最大值为 1.0 * scale
+            const r = AF * scale; 
+            const px = ox + r * Math.sin(theta);
+            const py = oy - r * Math.cos(theta); 
+            
+            if (angleDeg === -90) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+
+        // ==========================================
+        // 3. 绘制天线阵元物理位置
+        // ==========================================
+        ctx.fillStyle = '#000';
+        for (let i = 0; i < N; i++) {
+            ctx.beginPath();
+            // 在画布底部绘制小方块代表天线
+            ctx.rect(ox + antennasX[i] - 2, oy - 4, 4, 4);
+            ctx.fill();
+        }
+    }
+
+    // 初始化运行
+    updateParams();
+    render();
+</script>
+</body>
+</html>

@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天线偶极子 EDA 仿真系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 核心视觉风格：纯黑背景，科技感发光 */
+        body { margin: 0; overflow: hidden; background-color: #000000; color: #e0e0e0; font-family: 'Courier New', Courier, monospace; }
+        .neon-text-cyan { text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 20px #00ffff; color: #ffffff; }
+        .neon-text-green { text-shadow: 0 0 5px #00ff00; color: #aaffaa; }
+        .neon-border { border: 1px solid rgba(0, 255, 255, 0.3); box-shadow: 0 0 10px rgba(0, 255, 255, 0.1) inset; }
+        
+        /* 滚动条美化 (审计与精细控制) */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #050505; border-left: 1px solid #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: #00aaaa; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00ffff; }
+
+        /* 自定义控制面板控件 */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%; background: #00ffff; cursor: pointer; box-shadow: 0 0 5px #00ffff; margin-top: -6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 2px; cursor: pointer; background: #333; }
+        
+        .panel-header { cursor: move; }
+        
+        /* 确保移动端适配 */
+        @media (max-width: 768px) {
+            .main-layout { flex-direction: column; }
+            .control-panel { height: 40vh; width: 100%; border-left: none; border-top: 1px solid #00aaaa; }
+            .canvas-container { height: 60vh; }
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex main-layout text-sm">
+
+    <!-- 左侧：动画演示区 -->
+    <div class="canvas-container flex-grow relative bg-black overflow-hidden" id="canvas-wrapper">
+        <canvas id="simCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+        
+        <!-- HUD 遥测面板 (可拖拽) -->
+        <div id="hudPanel" class="absolute top-4 left-4 w-64 bg-black/80 neon-border rounded p-2 backdrop-blur-sm select-none z-10">
+            <div class="panel-header border-b border-gray-700 pb-1 mb-2 text-cyan-400 font-bold flex justify-between items-center">
+                <span>HUD_TELEMETRY</span>
+                <span class="text-xs cursor-pointer" onclick="toggleDisplay('hudContent')">[-]</span>
+            </div>
+            <div id="hudContent" class="space-y-1 text-xs text-gray-300">
+                <div class="flex justify-between"><span>System Freq:</span> <span id="hudFreq" class="text-green-400">300 MHz</span></div>
+                <div class="flex justify-between"><span>Wavelength (λ):</span> <span id="hudLambda" class="text-green-400">1.00 m</span></div>
+                <div class="flex justify-between"><span>Dipole Length (L):</span> <span id="hudLength" class="text-green-400">0.50 λ</span></div>
+                <div class="flex justify-between"><span>Max Directivity:</span> <span id="hudGain" class="text-yellow-400">2.15 dBi</span></div>
+                <div class="flex justify-between"><span>Vector Potential (A):</span> <span class="text-blue-400">∫(μI/4πr)e^(-jkr)dl</span></div>
+                <div class="flex justify-between"><span>Status:</span> <span class="text-green-500 animate-pulse">ACTIVE / AUDITED</span></div>
+            </div>
+        </div>
+
+        <!-- 示波器面板 (可拖拽) -->
+        <div id="oscPanel" class="absolute bottom-4 left-4 w-72 bg-black/80 neon-border rounded p-2 backdrop-blur-sm select-none z-10">
+            <div class="panel-header border-b border-gray-700 pb-1 mb-2 text-cyan-400 font-bold flex justify-between items-center">
+                <span>OSCILLOSCOPE_E_FIELD</span>
+                <span class="text-xs cursor-pointer" onclick="toggleDisplay('oscContent')">[-]</span>
+            </div>
+            <div id="oscContent" class="h-24 relative">
+                <canvas id="oscCanvas" class="w-full h-full"></canvas>
+                <div class="absolute top-0 right-1 text-[10px] text-gray-500">Amplitude / Time</div>
+            </div>
+        </div>
+
+        <!-- 视角控制提示 -->
+        <div class="absolute bottom-4 right-4 text-xs text-gray-600 text-right pointer-events-none">
+            <p>Left Click + Drag: Rotate 3D View</p>
+            <p>Scroll: Zoom Canvas (50% - 120%)</p>
+        </div>
+    </div>
+
+    <!-- 右侧：交互控制面板 -->
+    <div class="control-panel w-96 bg-[#0a0a0a] border-l border-[#004444] flex flex-col shrink-0 z-20">
+        <!-- 头部 -->
+        <div class="p-4 border-b border-[#113333] bg-[#050505]">
+            <h1 class="text-xl font-bold neon-text-cyan tracking-wider">DIPOLE_SIM_V1.0</h1>
+            <p class="text-xs text-gray-400 mt-1">EDA Electromagnetic Radiation Analysis</p>
+        </div>
+
+        <!-- 控制分区 (可滚动) -->
+        <div class="flex-grow overflow-y-auto p-4 space-y-6">
+            
+            <!-- 物理参数调节 -->
+            <div class="space-y-3">
+                <h2 class="text-sm font-bold text-cyan-500 border-b border-gray-800 pb-1">PHYSICS PARAMETERS</h2>
+                
+                <div>
+                    <label class="flex justify-between text-xs text-gray-300 mb-1">
+                        <span>Antenna Length (L)</span>
+                        <span id="lblLength">0.5 λ (Half-wave)</span>
+                    </label>
+                    <input type="range" id="paramLength" min="0.1" max="1.5" step="0.1" value="0.5">
+                </div>
+                
+                <div>
+                    <label class="flex justify-between text-xs text-gray-300 mb-1">
+                        <span>Simulation Time Speed</span>
+                        <span id="lblSpeed">1.0x</span>
+                    </label>
+                    <input type="range" id="paramSpeed" min="0" max="3" step="0.1" value="1.0">
+                </div>
+                
+                <div>
+                    <label class="flex justify-between text-xs text-gray-300 mb-1">
+                        <span>Line Thickness (Visual)</span>
+                        <span id="lblThick">2 px</span>
+                    </label>
+                    <input type="range" id="paramThick" min="1" max="5" step="0.5" value="2">
+                </div>
+            </div>
+
+            <!-- 图层开关 -->
+            <div class="space-y-3">
+                <h2 class="text-sm font-bold text-cyan-500 border-b border-gray-800 pb-1">RENDER LAYERS</h2>
+                
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="layerPattern" checked class="accent-cyan-500">
+                    <span class="text-xs text-gray-300">3D Radiation Pattern Mesh</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="layerPolar" checked class="accent-cyan-500">
+                    <span class="text-xs text-gray-300">2D Polar Projection (Far Field)</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="layerGrid" checked class="accent-cyan-500">
+                    <span class="text-xs text-gray-300">Perspective Reference Grid</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="layerEField" checked class="accent-cyan-500">
+                    <span class="text-xs text-gray-300">Electric Field (E) Vectors</span>
+                </label>
+            </div>
+
+            <!-- 公式与原理 -->
+            <div class="space-y-2">
+                <h2 class="text-sm font-bold text-cyan-500 border-b border-gray-800 pb-1">GOVERNING EQUATIONS</h2>
+                <div class="bg-[#111] p-2 rounded border border-gray-800 text-[11px] text-gray-400 font-mono space-y-1">
+                    <p><strong>Maxwell's (Phasor):</strong></p>
+                    <p>∇ × E = -jωμH</p>
+                    <p>∇ × H = J + jωεE</p>
+                    <hr class="border-gray-800 my-1">
+                    <p><strong>Dipole Far-Field (E_θ):</strong></p>
+                    <p>E_θ ≈ jη(I0/2πr) * e^(-jkr) * F(θ)</p>
+                    <p>F(θ) = [cos(kl/2*cosθ) - cos(kl/2)] / sinθ</p>
+                    <p class="text-[9px] text-gray-600 mt-2">* Strictly adherent to rigorous electromagnetic theorems.</p>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- 底部状态栏 -->
+        <div class="p-3 border-t border-[#113333] bg-[#050505] text-[10px] text-gray-500 flex justify-between items-center">
+            <span>ENGINE: CANVAS 2D_PROJECTION</span>
+            <span id="fpsCounter" class="text-green-500">FPS: 60</span>
+        </div>
+    </div>
+
+<script>
+/**
+ * 天线偶极子仿真引擎 (Canvas 2D 模拟 3D 渲染)
+ * 原则：简洁、稳固、可逆、可审计
+ */
+
+// --- 状态与核心参数配置 ---
+const state = {
+    dipoleLength: 0.5, // 单位: 波长(λ)
+    time: 0,
+    timeSpeed: 1.0,
+    lineThickness: 2,
+    
+    // 摄像机视角参数
+    camTheta: Math.PI / 4, // 仰角
+    camPhi: Math.PI / 4,   // 方位角
+    zoom: 1.0,
+    
+    // 渲染图层控制
+    showPattern: true,
+    showPolar: true,
+    showGrid: true,
+    showEField: true,
+    
+    // 交互状态
+    isDragging: false,
+    lastMouseX: 0,
+    lastMouseY: 0
+};
+
+// --- DOM 元素引用 ---
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const oscCanvas = document.getElementById('oscCanvas');
+const oscCtx = oscCanvas.getContext('2d');
+const canvasWrapper = document.getElementById('canvas-wrapper');
+
+// --- 缩放与自适应 ---
+function resize() {
+    canvas.width = canvasWrapper.clientWidth;
+    canvas.height = canvasWrapper.clientHeight;
+    
+    oscCanvas.width = oscCanvas.clientWidth;
+    oscCanvas.height = oscCanvas.clientHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- 3D 投影核心引擎 (稳固、可逆的数学基础) ---
+// 将 3D 空间坐标 (x,y,z) 映射到 2D 屏幕画布
+function project(x, y, z) {
+    // 1. 绕 Z 轴旋转 (方位角 camPhi)
+    const x1 = x * Math.cos(state.camPhi) - y * Math.sin(state.camPhi);
+    const y1 = x * Math.sin(state.camPhi) + y * Math.cos(state.camPhi);
+    
+    // 2. 绕 X 轴旋转 (仰角 camTheta)
+    const y2 = y1 * Math.cos(state.camTheta) - z * Math.sin(state.camTheta);
+    const z2 = y1 * Math.sin(state.camTheta) + z * Math.cos(state.camTheta);
+    
+    // 3. 基础正交投影 + 缩放系数 (摒弃复杂的透视矩阵以追求性能和渲染纯粹性)
+    const scale = 200 * state.zoom; 
+    
+    return {
+        x: canvas.width / 2 + x1 * scale,
+        y: canvas.height / 2 - y2 * scale, // Y 轴翻转，适应屏幕坐标系
+        z: z2 // 保留深度信息用于简单的 Z-排序或特效
+    };
+}
+
+// --- 物理计算模型：天线辐射方向图函数 ---
+// F(θ) = [cos(k*L/2 * cos(θ)) - cos(k*L/2)] / sin(θ)
+function calculatePatternRadius(theta, lengthLambda) {
+    if (theta <= 0.01 || theta >= Math.PI - 0.01) return 0; // 极点处辐射为0以防除零错误
+    const kL_2 = Math.PI * lengthLambda; // k = 2pi/lambda; l/2. So k*l/2 = pi * (l/lambda)
+    const num = Math.cos(kL_2 * Math.cos(theta)) - Math.cos(kL_2);
+    const den = Math.sin(theta);
+    return Math.abs(num / den);
+}
+
+// 颜色映射算法：基于辐射强度计算 HSL (冷色到暖色，科技感 EDA 风格)
+function getColor(intensity, maxIntensity) {
+    const ratio = intensity / maxIntensity;
+    // H: 240(Blue) -> 0(Red). 
+    const hue = (1 - ratio) * 240;
+    return `hsl(${hue}, 100%, 50%)`;
+}
+
+// --- 渲染模块 ---
+function renderGrid() {
+    if (!state.showGrid) return;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)';
+    ctx.beginPath();
+    
+    const size = 3;
+    const steps = 10;
+    for (let i = -size; i <= size; i += size/steps) {
+        // X 方向线
+        let p1 = project(i, -size, 0);
+        let p2 = project(i, size, 0);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        
+        // Y 方向线
+        p1 = project(-size, i, 0);
+        p2 = project(size, i, 0);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+    }
+    ctx.stroke();
+
+    // 坐标轴 Z (天线本体位置参考)
+    ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    let pZ1 = project(0, 0, -2);
+    let pZ2 = project(0, 0, 2);
+    ctx.moveTo(pZ1.x, pZ1.y);
+    ctx.lineTo(pZ2.x, pZ2.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function render3DPattern() {
+    if (!state.showPattern) return;
+    
+    const dTheta = Math.PI / 30; // 经线密度
+    const dPhi = Math.PI / 30;   // 纬线密度
+    let maxR = 0;
+    
+    // 预计算最大半径用于归一化
+    for (let th = 0; th <= Math.PI; th += dTheta) {
+        let r = calculatePatternRadius(th, state.dipoleLength);
+        if (r > maxR) maxR = r;
+    }
+    
+    if (maxR === 0) return;
+
+    ctx.lineWidth = state.lineThickness;
+    
+    // 绘制纬线圈 (固定 theta，改变 phi)
+    for (let th = dTheta; th < Math.PI; th += dTheta*2) {
+        let r = calculatePatternRadius(th, state.dipoleLength);
+        const normR = r / maxR;
+        ctx.strokeStyle = getColor(r, maxR);
+        ctx.beginPath();
+        for (let ph = 0; ph <= Math.PI * 2.01; ph += dPhi) {
+            let x = r * Math.sin(th) * Math.cos(ph);
+            let y = r * Math.sin(th) * Math.sin(ph);
+            let z = r * Math.cos(th);
+            let p = project(x, y, z);
+            if (ph === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+    }
+
+    // 绘制经线圈 (固定 phi，改变 theta)
+    for (let ph = 0; ph < Math.PI * 2; ph += dPhi*3) {
+        ctx.beginPath();
+        let first = true;
+        for (let th = 0; th <= Math.PI; th += dTheta) {
+            let r = calculatePatternRadius(th, state.dipoleLength);
+            ctx.strokeStyle = getColor(r, maxR); 
+            // 注意：经线颜色随 r 变化，Canvas单条路径不支持渐变描边，
+            // 严谨起见，我们将经线打断绘制
+            let x = r * Math.sin(th) * Math.cos(ph);
+            let y = r * Math.sin(th) * Math.sin(ph);
+            let z = r * Math.cos(th);
+            let p = project(x, y, z);
+            
+            if (first) {
+                ctx.moveTo(p.x, p.y);
+                first = false;
+            } else {
+                ctx.beginPath();
+                // 使用上一个点到这个点连线
+                let prevTh = th - dTheta;
+                let prevR = calculatePatternRadius(prevTh, state.dipoleLength);
+                let px = prevR * Math.sin(prevTh) * Math.cos(ph);
+                let py = prevR * Math.sin(prevTh) * Math.sin(ph);
+                let pz = prevR * Math.cos(prevTh);
+                let pp = project(px, py, pz);
+                
+                ctx.moveTo(pp.x, pp.y);
+                ctx.lineTo(p.x, p.y);
+                ctx.strokeStyle = getColor(r, maxR);
+                ctx.stroke();
+            }
+        }
+    }
+}
+
+function render2DPolar() {
+    if (!state.showPolar) return;
+    // 渲染右侧平面 2D 极坐标图截面
+    const cx = canvas.width - 150;
+    const cy = 150;
+    const radius = 100;
+    
+    // 绘制极坐标网格
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * (i/4), 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    
+    ctx.beginPath();
+    ctx.moveTo(cx - radius, cy); ctx.lineTo(cx + radius, cy);
+    ctx.moveTo(cx, cy - radius); ctx.lineTo(cx, cy + radius);
+    ctx.stroke();
+
+    // 计算最大R
+    let maxR = 0;
+    for (let th = 0; th <= Math.PI; th += 0.05) {
+        maxR = Math.max(maxR, calculatePatternRadius(th, state.dipoleLength));
+    }
+    
+    // 绘制方向图截面 E-plane
+    ctx.strokeStyle = '#00ffff';
+    ctx.lineWidth = state.lineThickness;
+    ctx.beginPath();
+    for (let th = 0; th <= Math.PI * 2; th += 0.05) {
+        let plotTh = th;
+        let mirror = false;
+        if (th > Math.PI) {
+            plotTh = th - Math.PI;
+            mirror = true;
+        }
+        let r = calculatePatternRadius(plotTh, state.dipoleLength);
+        let normalizedR = maxR === 0 ? 0 : (r / maxR) * radius;
+        
+        let x = cx + normalizedR * Math.sin(th);
+        let y = cy - normalizedR * Math.cos(th);
+        
+        if (th === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    
+    ctx.fillStyle = '#00ffff';
+    ctx.font = '10px monospace';
+    ctx.fillText('E-Plane Pattern', cx - 40, cy + radius + 15);
+}
+
+function renderEFieldWaves() {
+    if (!state.showEField) return;
+    
+    ctx.lineWidth = state.lineThickness;
+    const numWaves = 5;
+    
+    // 模拟电磁波向外辐射的电场矢量
+    for (let i = 0; i < numWaves; i++) {
+        // 波的前进距离随时间变化
+        let rBase = ((state.time * 2 + i * (10 / numWaves)) % 10);
+        
+        ctx.strokeStyle = `rgba(0, 255, 0, ${1 - rBase/10})`; // 随距离衰减
+        
+        // 在赤道面 (XY) 绘制扩展的圆表示波阵面
+        ctx.beginPath();
+        for (let ph = 0; ph <= Math.PI * 2; ph += 0.2) {
+            let x = rBase * Math.cos(ph);
+            let y = rBase * Math.sin(ph);
+            let z = 0;
+            let p = project(x, y, z);
+            if (ph === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+    }
+}
+
+// --- 示波器逻辑 ---
+const oscHistory = [];
+function updateOscilloscope() {
+    // 模拟某观测点 (远区) 的电场瞬时值: E(t) = E0 * sin(ωt - kr)
+    // 假设 ω = 1 (归一化), 观察波形
+    const val = Math.sin(state.time * 5); 
+    oscHistory.push(val);
+    if (oscHistory.length > oscCanvas.width) {
+        oscHistory.shift();
+    }
+    
+    // 渲染示波器
+    oscCtx.clearRect(0, 0, oscCanvas.width, oscCanvas.height);
+    
+    // 中线
+    oscCtx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
+    oscCtx.beginPath();
+    oscCtx.moveTo(0, oscCanvas.height/2);
+    oscCtx.lineTo(oscCanvas.width, oscCanvas.height/2);
+    oscCtx.stroke();
+    
+    // 波形
+    oscCtx.strokeStyle = '#00ff00';
+    oscCtx.lineWidth = 1.5;
+    oscCtx.beginPath();
+    const midY = oscCanvas.height / 2;
+    const amp = midY * 0.8;
+    for (let i = 0; i < oscHistory.length; i++) {
+        let x = i;
+        let y = midY - oscHistory[i] * amp;
+        if (i === 0) oscCtx.moveTo(x, y);
+        else oscCtx.lineTo(x, y);
+    }
+    oscCtx.stroke();
+}
+
+// --- 主渲染循环 ---
+let lastFrameTime = performance.now();
+let frameCount = 0;
+
+function animate() {
+    // 计算 FPS
+    const now = performance.now();
+    frameCount++;
+    if (now - lastFrameTime >= 1000) {
+        document.getElementById('fpsCounter').innerText = `FPS: ${frameCount}`;
+        frameCount = 0;
+        lastFrameTime = now;
+    }
+
+    // 更新物理时间
+    state.time += 0.01 * state.timeSpeed;
+    
+    // 如果没有拖拽，微弱自转以展示全貌
+    if (!state.isDragging) {
+        state.camPhi += 0.002 * state.timeSpeed;
+    }
+
+    // 清屏，使用轻微的透明度营造荧光余辉效果
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    renderGrid();
+    render3DPattern();
+    render2DPolar();
+    renderEFieldWaves();
+    updateOscilloscope();
+
+    requestAnimationFrame(animate);
+}
+
+// --- 交互控制逻辑绑定 ---
+
+// 面板通用折叠函数
+function toggleDisplay(id) {
+    const el = document.getElementById(id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// UI 拖拽逻辑 (工程审计: 确保UI无遮挡且灵活性高)
+function makeDraggable(element, handleClass) {
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    const header = element.querySelector('.' + handleClass);
+    if (header) {
+        header.onmousedown = dragMouseDown;
+    } else {
+        element.onmousedown = dragMouseDown;
+    }
+
+    function dragMouseDown(e) {
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+    }
+
+    function elementDrag(e) {
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        element.style.top = (element.offsetTop - pos2) + "px";
+        element.style.left = (element.offsetLeft - pos1) + "px";
+    }
+
+    function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+    }
+}
+
+makeDraggable(document.getElementById('hudPanel'), 'panel-header');
+makeDraggable(document.getElementById('oscPanel'), 'panel-header');
+
+// Canvas 视角拖拽
+canvasWrapper.addEventListener('mousedown', (e) => {
+    state.isDragging = true;
+    state.lastMouseX = e.clientX;
+    state.lastMouseY = e.clientY;
+});
+window.addEventListener('mouseup', () => { state.isDragging = false; });
+window.addEventListener('mousemove', (e) => {
+    if (state.isDragging) {
+        const dx = e.clientX - state.lastMouseX;
+        const dy = e.clientY - state.lastMouseY;
+        state.camPhi -= dx * 0.01;
+        state.camTheta += dy * 0.01;
+        
+        // 限制仰角避免翻转
+        state.camTheta = Math.max(-Math.PI/2, Math.min(Math.PI/2, state.camTheta));
+        
+        state.lastMouseX = e.clientX;
+        state.lastMouseY = e.clientY;
+    }
+});
+
+// Canvas 滚轮缩放 (50% - 120% / 0.5 - 1.2)
+canvasWrapper.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    state.zoom -= e.deltaY * 0.001;
+    state.zoom = Math.max(0.5, Math.min(1.2, state.zoom));
+});
+
+// 右侧控制面板数据绑定
+document.getElementById('paramLength').addEventListener('input', (e) => {
+    state.dipoleLength = parseFloat(e.target.value);
+    document.getElementById('lblLength').innerText = `${state.dipoleLength.toFixed(1)} λ`;
+    document.getElementById('hudLength').innerText = `${state.dipoleLength.toFixed(2)} λ`;
+});
+
+document.getElementById('paramSpeed').addEventListener('input', (e) => {
+    state.timeSpeed = parseFloat(e.target.value);
+    document.getElementById('lblSpeed').innerText = `${state.timeSpeed.toFixed(1)}x`;
+});
+
+document.getElementById('paramThick').addEventListener('input', (e) => {
+    state.lineThickness = parseFloat(e.target.value);
+    document.getElementById('lblThick').innerText = `${state.lineThickness} px`;
+});
+
+// 图层开关绑定
+document.getElementById('layerPattern').addEventListener('change', (e) => state.showPattern = e.target.checked);
+document.getElementById('layerPolar').addEventListener('change', (e) => state.showPolar = e.target.checked);
+document.getElementById('layerGrid').addEventListener('change', (e) => state.showGrid = e.target.checked);
+document.getElementById('layerEField').addEventListener('change', (e) => state.showEField = e.target.checked);
+
+// --- 启动系统 ---
+animate();
+
+</script>
+</body>
+</html>

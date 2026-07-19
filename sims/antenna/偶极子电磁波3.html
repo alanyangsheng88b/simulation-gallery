@@ -1,0 +1,950 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>偶极子电场线 — 生成过程全可视化</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body {
+    margin: 0; overflow: hidden;
+    background-color: #0a0a14;
+    color: #e5e7eb;
+    font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+  .control-panel {
+    background: rgba(8, 8, 18, 0.94);
+    backdrop-filter: blur(14px);
+    border-left: 1px solid #1e293b;
+  }
+  input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; height: 16px; width: 16px;
+    border-radius: 50%; background: #22d3ee;
+    cursor: pointer; margin-top: -6px;
+    box-shadow: 0 0 14px rgba(34, 211, 238, 0.5);
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    width: 100%; height: 4px; cursor: pointer;
+    background: #334155; border-radius: 2px;
+  }
+  input[type=range]:focus { outline: none; }
+
+  .toggle-checkbox:checked { right: 0; border-color: #22d3ee; }
+  .toggle-checkbox:checked + .toggle-label { background-color: #22d3ee; }
+
+  .charge {
+    position: absolute; width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 18px;
+    transform: translate(-50%, -50%);
+    z-index: 10; pointer-events: none;
+    transition: box-shadow 0.3s;
+  }
+  .charge.positive {
+    background: radial-gradient(circle at 40% 35%, #ff7b7b, #d63031);
+    color: white; box-shadow: 0 0 28px 6px rgba(239, 68, 68, 0.6);
+  }
+  .charge.negative {
+    background: radial-gradient(circle at 40% 35%, #6bb5ff, #225cc7);
+    color: white; box-shadow: 0 0 28px 6px rgba(59, 130, 246, 0.6);
+  }
+
+  .legend-gradient {
+    width: 100%; height: 14px; border-radius: 4px;
+    background: linear-gradient(to right,
+      #1a56db, #4f8cf7, #1e3a5f, #0a0a14,
+      #3f1a1a, #c53030, #e53e3e);
+  }
+
+  .scene-tab {
+    flex: 1; padding: 7px 8px; border-radius: 6px; font-size: 11px;
+    cursor: pointer; transition: all 0.2s; text-align: center;
+    border: 1px solid #334155; background: transparent; color: #64748b;
+    white-space: nowrap;
+  }
+  .scene-tab.active {
+    background: #0c2d3b; border-color: #22d3ee; color: #22d3ee;
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.2);
+  }
+  .scene-tab:hover:not(.active) { border-color: #475569; color: #94a3b8; }
+
+  /* Pulse animation for closed field lines */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .seed-ring {
+    position: absolute;
+    border: 1px dashed rgba(251, 191, 36, 0.35);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4; pointer-events: none;
+  }
+</style>
+</head>
+<body class="flex h-screen w-screen">
+
+<!-- ========== Canvas ========== -->
+<div class="flex-grow relative overflow-hidden" id="canvas-container">
+  <canvas id="simCanvas" class="block w-full h-full"></canvas>
+  <div id="chargePos" class="charge positive">+</div>
+  <div id="chargeNeg" class="charge negative">−</div>
+  <div id="seedRing" class="seed-ring" style="display:none;"></div>
+
+  <div id="startOverlay" class="absolute inset-0 bg-black/85 flex flex-col items-center justify-center z-50">
+    <h1 class="text-4xl font-light mb-3 text-cyan-400 tracking-widest">偶极子 · 电场线仿真</h1>
+    <p class="text-gray-400 text-sm mb-8 max-w-md text-center leading-relaxed">
+      两个场景展示电场线的<b>完整生成过程</b><br>
+      场景一：振荡天线辐射场 | 场景二：静态偶极子 生成→闭合
+    </p>
+    <button id="startBtn" class="px-10 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-full text-lg transition-all shadow-[0_0_20px_rgba(8,145,178,0.5)] hover:shadow-[0_0_30px_rgba(8,145,178,0.7)]">
+      启动仿真
+    </button>
+  </div>
+</div>
+
+<!-- ========== 控制面板 ========== -->
+<div class="w-80 flex-shrink-0 control-panel p-5 flex flex-col gap-4 overflow-y-auto">
+
+  <div class="text-xs font-light text-cyan-400 tracking-wider border-b border-gray-700 pb-2">场景选择</div>
+  <div class="flex gap-2">
+    <button class="scene-tab active" data-scene="antenna">场景一 · 振荡天线</button>
+    <button class="scene-tab" data-scene="static">场景二 · 静态偶极</button>
+  </div>
+
+  <!-- 场景一参数 -->
+  <div id="panelAntenna" class="flex flex-col gap-4">
+    <div class="text-sm font-light text-cyan-400 tracking-wider border-b border-gray-700 pb-1">天线参数</div>
+    <div>
+      <div class="flex justify-between text-xs mb-1 text-gray-400"><span>振荡频率</span><span id="valSpeed">1.0x</span></div>
+      <input type="range" id="paramSpeed" min="0.1" max="3" step="0.1" value="1">
+    </div>
+    <div>
+      <div class="flex justify-between text-xs mb-1 text-gray-400"><span>电荷间距</span><span id="valAmplitude">中</span></div>
+      <input type="range" id="paramAmplitude" min="5" max="60" step="1" value="25">
+    </div>
+    <div>
+      <div class="flex justify-between text-xs mb-1 text-gray-400"><span>波长（视野）</span><span id="valScale">100%</span></div>
+      <input type="range" id="paramScale" min="50" max="400" step="10" value="200">
+    </div>
+  </div>
+
+  <!-- 场景二参数 -->
+  <div id="panelStatic" class="hidden flex flex-col gap-4">
+    <div class="text-sm font-light text-cyan-400 tracking-wider border-b border-gray-700 pb-1">偶极子参数</div>
+    <div>
+      <div class="flex justify-between text-xs mb-1 text-gray-400"><span>电荷间距</span><span id="valDipoleSep">100px</span></div>
+      <input type="range" id="paramDipoleSep" min="40" max="220" step="5" value="100">
+    </div>
+    <div>
+      <div class="flex justify-between text-xs mb-1 text-gray-400"><span>场线数量</span><span id="valTraceCount">16</span></div>
+      <input type="range" id="paramTraceCount" min="4" max="32" step="2" value="16">
+    </div>
+    <div>
+      <div class="flex justify-between text-xs mb-1 text-gray-400"><span>生长速度</span><span id="valTraceSpeed">1.0x</span></div>
+      <input type="range" id="paramTraceSpeed" min="0.3" max="4" step="0.1" value="1">
+    </div>
+    <div>
+      <div class="flex justify-between text-xs mb-1 text-gray-400"><span>积分步长</span><span id="valStepSize">3px</span></div>
+      <input type="range" id="paramStepSize" min="1" max="8" step="0.5" value="3">
+    </div>
+    <div>
+      <div class="flex justify-between text-xs mb-1 text-gray-400"><span>闭合后停留</span><span id="valHoldTime">2.0s</span></div>
+      <input type="range" id="paramHoldTime" min="0.5" max="5" step="0.5" value="2">
+    </div>
+
+    <!-- 循环状态显示 -->
+    <div class="bg-gray-900/60 rounded-lg p-3 text-xs space-y-1.5 border border-gray-800">
+      <div class="flex justify-between">
+        <span class="text-gray-500">循环阶段</span>
+        <span id="cyclePhase" class="text-cyan-400">等待启动</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-gray-500">已闭合</span>
+        <span id="closedCount">0 / 16</span>
+      </div>
+      <div class="w-full bg-gray-800 rounded-full h-1.5 mt-1 overflow-hidden">
+        <div id="cycleProgress" class="bg-cyan-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 通用参数 -->
+  <div class="text-sm font-light text-cyan-400 tracking-wider border-b border-gray-700 pb-1">通用参数</div>
+  <div>
+    <div class="flex justify-between text-xs mb-1 text-gray-400"><span>等值线密度</span><span id="valDensity">中</span></div>
+    <input type="range" id="paramDensity" min="1" max="5" step="1" value="3">
+  </div>
+  <div>
+    <div class="flex justify-between text-xs mb-1 text-gray-400"><span>场线亮度</span><span id="valBrightness">70%</span></div>
+    <input type="range" id="paramBrightness" min="0.1" max="1" step="0.05" value="0.7">
+  </div>
+  <div>
+    <div class="flex justify-between text-xs mb-1 text-gray-400"><span>计算网格精度</span><span id="valCellSize">5px</span></div>
+    <input type="range" id="paramCellSize" min="3" max="15" step="1" value="5">
+  </div>
+
+  <!-- 图层控制 -->
+  <div class="text-sm font-light text-cyan-400 tracking-wider border-t border-b border-gray-700 py-2 mt-1">可视化图层</div>
+  <div class="flex items-center justify-between">
+    <span class="text-xs text-gray-400">流函数热力图</span>
+    <div class="relative inline-block w-10 align-middle select-none">
+      <input type="checkbox" id="toggleHeatmap" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-gray-600 appearance-none cursor-pointer transition-all duration-300 top-0 left-0 checked:border-cyan-500"/>
+      <label for="toggleHeatmap" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-600 cursor-pointer transition-all duration-300"></label>
+    </div>
+  </div>
+  <div id="legendBox" class="hidden space-y-1">
+    <div class="legend-gradient"></div>
+    <div class="flex justify-between text-[10px] text-gray-500"><span>负值（蓝）</span><span>零</span><span>正值（红）</span></div>
+  </div>
+  <div class="flex items-center justify-between" id="rowDotGrid">
+    <span class="text-xs text-gray-400">背景点阵</span>
+    <div class="relative inline-block w-10 align-middle select-none">
+      <input type="checkbox" id="toggleDotGrid" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-gray-600 appearance-none cursor-pointer transition-all duration-300 top-0 left-0 checked:border-cyan-500"/>
+      <label for="toggleDotGrid" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-600 cursor-pointer transition-all duration-300"></label>
+    </div>
+  </div>
+  <div class="flex items-center justify-between">
+    <span class="text-xs text-gray-400">计算网格线</span>
+    <div class="relative inline-block w-10 align-middle select-none">
+      <input type="checkbox" id="toggleGrid" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-gray-600 appearance-none cursor-pointer transition-all duration-300 top-0 left-0 checked:border-cyan-500"/>
+      <label for="toggleGrid" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-600 cursor-pointer transition-all duration-300"></label>
+    </div>
+  </div>
+  <div class="flex items-center justify-between">
+    <span class="text-xs text-gray-400">方向箭头</span>
+    <div class="relative inline-block w-10 align-middle select-none">
+      <input type="checkbox" id="toggleArrows" checked class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-gray-600 appearance-none cursor-pointer transition-all duration-300 top-0 left-0 checked:border-cyan-500"/>
+      <label for="toggleArrows" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-600 cursor-pointer transition-all duration-300"></label>
+    </div>
+  </div>
+  <div class="flex items-center justify-between">
+    <span class="text-xs text-gray-400">等值线叠加</span>
+    <div class="relative inline-block w-10 align-middle select-none">
+      <input type="checkbox" id="toggleContours" checked class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-gray-600 appearance-none cursor-pointer transition-all duration-300 top-0 left-0 checked:border-cyan-500"/>
+      <label for="toggleContours" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-600 cursor-pointer transition-all duration-300"></label>
+    </div>
+  </div>
+  <div class="flex items-center justify-between" id="rowTraces">
+    <span class="text-xs text-gray-400">电荷振荡轨迹</span>
+    <div class="relative inline-block w-10 align-middle select-none">
+      <input type="checkbox" id="toggleTraces" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-gray-600 appearance-none cursor-pointer transition-all duration-300 top-0 left-0 checked:border-cyan-500"/>
+      <label for="toggleTraces" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-600 cursor-pointer transition-all duration-300"></label>
+    </div>
+  </div>
+  <div class="flex items-center justify-between" id="rowSeeds">
+    <span class="text-xs text-gray-400">种子环</span>
+    <div class="relative inline-block w-10 align-middle select-none">
+      <input type="checkbox" id="toggleSeeds" checked class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-gray-600 appearance-none cursor-pointer transition-all duration-300 top-0 left-0 checked:border-cyan-500"/>
+      <label for="toggleSeeds" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-600 cursor-pointer transition-all duration-300"></label>
+    </div>
+  </div>
+
+  <!-- 音频 -->
+  <div class="flex items-center justify-between pt-2 border-t border-gray-700">
+    <span class="text-xs text-gray-400">环境风声</span>
+    <div class="relative inline-block w-10 align-middle select-none">
+      <input type="checkbox" id="audioToggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-gray-600 appearance-none cursor-pointer transition-all duration-300 top-0 left-0 checked:border-cyan-500"/>
+      <label for="audioToggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-600 cursor-pointer transition-all duration-300"></label>
+    </div>
+  </div>
+
+  <!-- 状态 -->
+  <div class="text-[10px] text-gray-600 mt-auto pt-3 border-t border-gray-800 space-y-1">
+    <div>网格: <span id="infoGrid">-</span></div>
+    <div>等值线层: <span id="infoLevels">-</span></div>
+    <div>FPS: <span id="infoFps">-</span></div>
+    <div class="text-cyan-700 mt-2" id="infoFormula">
+      流函数 U 的等值线 = 电场线<br>E ⟂ ∇U
+    </div>
+  </div>
+</div>
+
+<!-- ========== 主脚本 ========== -->
+<script>
+// ╔══════════════════════════════════════════════════════════╗
+// ║  偶极子电场线 — 双场景：天线辐射 + 静态场线生成→闭合    ║
+// ╚══════════════════════════════════════════════════════════╝
+
+const state = {
+  scene: 'antenna',
+  t: 0, dt: 0.015,
+  baseSpeed: 1.0, amplitude: 25, lambda: 200,
+  brightness: 0.7, densityLevel: 3, cellSize: 5,
+  isRunning: false,
+
+  // 可视化开关
+  showHeatmap: false, showDotGrid: false, showGrid: false,
+  showArrows: true, showContours: true,
+  showTraces: false, showSeeds: true,
+
+  // 场景二参数
+  dipoleSep: 100,
+  traceCount: 16,
+  traceSpeed: 1.0,
+  stepSize: 3,
+  holdTime: 2.0,
+
+  // 场景二追踪状态
+  traceLines: [],
+  cyclePhase: 'growing',   // 'growing' | 'closed' | 'resetting'
+  closedHoldStart: 0,      // timestamp when all lines closed
+  closedCount: 0,
+
+  frameCount: 0, lastFpsTime: 0, currentFps: 0,
+};
+
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+const chargePos = document.getElementById('chargePos');
+const chargeNeg = document.getElementById('chargeNeg');
+const seedRing = document.getElementById('seedRing');
+const container = document.getElementById('canvas-container');
+
+let cols, rows, uGrid, heatmapImage;
+
+const allLevels = [0.02, 0.05, 0.1, 0.2, 0.35, 0.6, 1.0, 1.5, 2.5, 4.0, 7.0];
+const edgeTable = [
+  [], [0,3], [1,0], [1,3], [2,1], [0,3,2,1], [2,0], [2,3],
+  [3,2], [0,2], [1,0,3,2], [1,2], [3,1], [0,1], [3,0], []
+];
+
+const HEATMAP_MAX = Math.PI; // atan2 returns [-π, π]
+function heatmapColor(u) {
+  const t = Math.max(-1, Math.min(1, u / HEATMAP_MAX));
+  const s = Math.pow(Math.abs(t), 0.5);
+  if (t < 0) return [Math.floor(8+18*s), Math.floor(8+30*s), Math.floor(25+200*s)];
+  return [Math.floor(25+200*s), Math.floor(8+22*s), Math.floor(8+18*s)];
+}
+
+// ═══════════════ 画布 ═══════════════
+function getCanvasSize() {
+  return { w: container.clientWidth, h: container.clientHeight };
+}
+
+function resizeCanvas() {
+  const { w, h } = getCanvasSize();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr, dpr);
+  cols = Math.ceil(w / state.cellSize) + 1;
+  rows = Math.ceil(h / state.cellSize) + 1;
+  uGrid = new Float32Array(cols * rows);
+  heatmapImage = null;
+  document.getElementById('infoGrid').textContent = `${cols}×${rows}`;
+  if (state.scene === 'static') resetCycle();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ═══════════════ 场景一：振荡天线 ═══════════════
+function computeGridAntenna() {
+  const { w, h } = getCanvasSize();
+  const cx = w/2, cy = h/2, k = 2*Math.PI/state.lambda, omega = 2*Math.PI;
+  let idx = 0;
+  for (let j = 0; j < rows; j++) {
+    const y = -(j * state.cellSize - cy);
+    for (let i = 0; i < cols; i++) {
+      const x = i * state.cellSize - cx, r2 = x*x + y*y;
+      if (r2 < 0.5) { uGrid[idx++] = 0; continue; }
+      const r = Math.sqrt(r2), phase = omega * state.t - k * r;
+      uGrid[idx++] = (x*x/r2) * (Math.cos(phase)/(k*r) + Math.sin(phase));
+    }
+  }
+}
+
+function getElectricFieldAntenna(x, y, t) {
+  const r2 = x*x + y*y;
+  if (r2 < 2.0) return { x:0, y:0 };
+  const r = Math.sqrt(r2), k = 2*Math.PI/state.lambda, omega = 2*Math.PI;
+  const phi = omega*t - k*r;
+  const A = Math.cos(phi)/(r2*r) - k*Math.sin(phi)/r2;
+  const B = -(k*k*Math.cos(phi))/r;
+  return { x: (x*y/r2)*(3*A+B), y: A*(3*y*y/r2-1) + B*(y*y/r2-1) };
+}
+
+function updateChargesAntenna() {
+  const { w, h } = getCanvasSize();
+  const yOff = state.amplitude * Math.sin(2*Math.PI * state.t);
+  chargePos.style.left = `${w/2}px`; chargePos.style.top = `${h/2 - yOff}px`;
+  chargeNeg.style.left = `${w/2}px`; chargeNeg.style.top = `${h/2 + yOff}px`;
+}
+
+// ═══════════════ 场景二：垂直静态偶极子 ═══════════════
+// + 在上方 (cx, cy-d)  − 在下方 (cx, cy+d)
+// 流函数 ψ = atan2(y-d, x) − atan2(y+d, x) = atan2(−2dx, x²+y²−d²)
+// ═══════════════════════════════════════════════════════
+
+function computeGridStatic() {
+  const { w, h } = getCanvasSize();
+  const cx = w/2, cy = h/2, d = state.dipoleSep / 2;
+
+  let idx = 0;
+  for (let j = 0; j < rows; j++) {
+    const y = -(j * state.cellSize - cy);   // math y: up positive
+    for (let i = 0; i < cols; i++) {
+      const x = i * state.cellSize - cx;
+      const denom = x*x + y*y - d*d;
+      const numer = -2 * d * x;             // atan2(-2dx, x²+y²−d²)
+      if (Math.abs(denom) < 1e-6 && Math.abs(numer) < 1e-6) {
+        uGrid[idx++] = 0; continue;
+      }
+      uGrid[idx++] = Math.atan2(numer, denom);
+    }
+  }
+}
+
+// 垂直偶极子电场：+ at (0,d), − at (0,−d) in math coords
+function getElectricFieldStatic(mx, my) {
+  const d = state.dipoleSep / 2;
+  const r1x = mx, r1y = my - d;     // distance from + charge
+  const r2x = mx, r2y = my + d;     // distance from − charge
+  const r13 = Math.pow(r1x*r1x + r1y*r1y, 1.5);
+  const r23 = Math.pow(r2x*r2x + r2y*r2y, 1.5);
+  if (r13 < 1e-6 || r23 < 1e-6) return { x:0, y:0 };
+  return { x: r1x/r13 - r2x/r23, y: r1y/r13 - r2y/r23 };
+}
+
+function updateChargesStatic() {
+  const { w, h } = getCanvasSize();
+  const d = state.dipoleSep / 2;
+  // + top, − bottom
+  chargePos.style.left = `${w/2}px`; chargePos.style.top = `${h/2 - d}px`;
+  chargeNeg.style.left = `${w/2}px`; chargeNeg.style.top = `${h/2 + d}px`;
+}
+
+// ═══════════════ 场线追踪系统（场景二核心） ═══════════════
+
+function createSeeds() {
+  const { w, h } = getCanvasSize();
+  const cx = w/2, cy = h/2, d = state.dipoleSep / 2;
+  const seedR = Math.max(8, d * 0.18); // 种子环半径与偶极子大小成比例
+
+  // 更新种子环 DOM
+  seedRing.style.left = `${cx}px`;
+  seedRing.style.top = `${cy - d}px`;
+  seedRing.style.width = `${seedR * 2}px`;
+  seedRing.style.height = `${seedR * 2}px`;
+  seedRing.style.display = state.showSeeds ? 'block' : 'none';
+
+  const n = state.traceCount;
+  const seeds = [];
+
+  // 种子均匀分布在 + 电荷周围、面向 − 电荷（下方）的宽弧上
+  // canvas 角度: 0=右, π/2=下, π=左
+  // 覆盖下方约 160° 弧段，确保所有闭合场线都能追踪到
+  const startAngle = Math.PI * 0.1;    // ~18°（接近水平向右）
+  const endAngle   = Math.PI * 0.9;    // ~162°（接近水平向左）
+  const arcRange = endAngle - startAngle;
+
+  for (let i = 0; i < n; i++) {
+    const angle = startAngle + (arcRange * i) / Math.max(1, n - 1);
+    seeds.push({
+      x: cx + seedR * Math.cos(angle),
+      y: (cy - d) + seedR * Math.sin(angle),
+      angle
+    });
+  }
+  return seeds;
+}
+
+function resetCycle() {
+  const seeds = createSeeds();
+  state.traceLines = seeds.map(s => ({
+    seed: s,
+    points: [{ x: s.x, y: s.y }],
+    currentX: s.x, currentY: s.y,
+    alive: true,
+    closed: false,
+    closeTime: 0,
+  }));
+  state.cyclePhase = 'growing';
+  state.closedCount = 0;
+  state.closedHoldStart = 0;
+  updateCycleUI();
+}
+
+function updateCycleUI() {
+  const countEl = document.getElementById('closedCount');
+  const phaseEl = document.getElementById('cyclePhase');
+  const progEl = document.getElementById('cycleProgress');
+  const total = state.traceLines.length;
+  const finished = state.traceLines.filter(l => !l.alive).length;
+  const actualClosed = state.traceLines.filter(l => l.closed).length;
+
+  if (countEl) countEl.textContent = `${actualClosed} / ${total}`;
+  if (progEl) progEl.style.width = `${(finished / total) * 100}%`;
+
+  if (state.cyclePhase === 'growing') {
+    if (phaseEl) { phaseEl.textContent = '🌱 追踪中'; phaseEl.className = 'text-yellow-400'; }
+  } else if (state.cyclePhase === 'closed') {
+    if (phaseEl) { phaseEl.textContent = '✓ 完成闭合'; phaseEl.className = 'text-green-400'; }
+  }
+}
+
+function traceFieldLines(timestamp) {
+  const { w, h } = getCanvasSize();
+  const cx = w/2, cy = h/2, d = state.dipoleSep / 2;
+  const negX = cx, negY = cy + d;
+  const stepsPerFrame = Math.round(state.traceSpeed * 3);
+  const total = state.traceLines.length;
+
+  if (state.cyclePhase === 'growing') {
+    for (const line of state.traceLines) {
+      if (!line.alive || line.closed) continue;
+
+      for (let s = 0; s < stepsPerFrame; s++) {
+        let px = line.currentX, py = line.currentY;
+        const h = state.stepSize;
+
+        // RK4 — 归一化方向场
+        const field = (px, py) => {
+          const E = getElectricFieldStatic(px - cx, -(py - cy));
+          const m = Math.sqrt(E.x*E.x + E.y*E.y);
+          if (m < 1e-12) return { dx:0, dy:0 };
+          return { dx: E.x/m, dy: -E.y/m };
+        };
+
+        const k1 = field(px, py);
+        const k2 = field(px + h*0.5*k1.dx, py + h*0.5*k1.dy);
+        const k3 = field(px + h*0.5*k2.dx, py + h*0.5*k2.dy);
+        const k4 = field(px + h*k3.dx,   py + h*k3.dy);
+
+        const nx = px + h/6*(k1.dx + 2*k2.dx + 2*k3.dx + k4.dx);
+        const ny = py + h/6*(k1.dy + 2*k2.dy + 2*k3.dy + k4.dy);
+
+        line.points.push({ x: nx, y: ny });
+        line.currentX = nx; line.currentY = ny;
+
+        // 闭合：到达 − 电荷
+        const distNeg = Math.hypot(nx-negX, ny-negY);
+        if (distNeg < 14) {
+          line.closed = true; line.alive = false;
+          line.closeTime = timestamp; break;
+        }
+
+        // 超出画布 → 标记为完成（外场线，不闭合但合理）
+        if (nx < -150 || nx > w+150 || ny < -150 || ny > h+150) {
+          line.alive = false; line.closed = false; // 离屏不计入闭合
+          line.closeTime = timestamp; break;
+        }
+
+        // 保护：避免无限追踪
+        if (line.points.length > 4000) { line.alive = false; break; }
+
+        // 回到 + 电荷附近（追踪方向错误）
+        const distPos = Math.hypot(nx-cx, ny-(cy-d));
+        if (line.points.length > 25 && distPos < 10) {
+          line.alive = false; break;
+        }
+      }
+    }
+
+    // 统计已完成的线（闭合或出界）
+    const finished = state.traceLines.filter(l => !l.alive).length;
+    state.closedCount = state.traceLines.filter(l => l.closed).length;
+    updateCycleUI();
+
+    // 全部追踪完成 → 进入保持阶段
+    if (finished >= total && total > 0) {
+      state.cyclePhase = 'closed';
+      state.closedHoldStart = timestamp;
+      updateCycleUI();
+    }
+  }
+
+  // 保持阶段
+  if (state.cyclePhase === 'closed') {
+    if ((timestamp - state.closedHoldStart) / 1000 >= state.holdTime) {
+      resetCycle();
+    }
+  }
+}
+
+function drawTraceLines(timestamp) {
+  for (const line of state.traceLines) {
+    const pts = line.points;
+    if (pts.length < 2) continue;
+
+    // 闭合后的场线闪烁
+    let globalAlpha = 1.0;
+    if (line.closed && state.cyclePhase === 'closed') {
+      const t = (timestamp - line.closeTime) / 1000;
+      globalAlpha = 0.7 + 0.3 * Math.sin(t * 3);
+    }
+
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (let i = 1; i < pts.length; i++) {
+      const frac = i / pts.length;
+      // 渐变色：+端(暖金) → −端(冷青)
+      const r = Math.floor(255*(1-frac) + 34*frac);
+      const g = Math.floor(180*(1-frac) + 211*frac);
+      const b = Math.floor(40*(1-frac) + 238*frac);
+      const alpha = globalAlpha * (0.5 + 0.5 * (1 - Math.abs(frac - 0.5)*2));
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.beginPath();
+      ctx.moveTo(pts[i-1].x, pts[i-1].y);
+      ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+    }
+
+    // 闭合线额外的光晕
+    if (line.closed && state.cyclePhase === 'closed') {
+      ctx.strokeStyle = `rgba(34,211,238,${0.15 + 0.1*Math.sin(timestamp/500)})`;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      for (let i = 1; i < pts.length; i++) {
+        ctx.moveTo(pts[i-1].x, pts[i-1].y);
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.stroke();
+    }
+  }
+}
+
+// ═══════════════ 背景点阵 ═══════════════
+
+function drawDotGrid() {
+  const { w, h } = getCanvasSize();
+  const spacing = 22;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
+  for (let x = spacing; x < w; x += spacing) {
+    for (let y = spacing; y < h; y += spacing) {
+      ctx.fillRect(x, y, 1.2, 1.2);
+    }
+  }
+}
+
+// ═══════════════ 热力图 ═══════════════
+
+function renderHeatmap() {
+  const { w, h } = getCanvasSize();
+  const cs = state.cellSize;
+  if (!heatmapImage || heatmapImage.width !== Math.floor(w) || heatmapImage.height !== Math.floor(h)) {
+    heatmapImage = ctx.createImageData(Math.floor(w), Math.floor(h));
+  }
+  const data = heatmapImage.data, imgW = heatmapImage.width;
+
+  for (let j = 0; j < rows-1; j++) {
+    for (let i = 0; i < cols-1; i++) {
+      const idx = j*cols + i;
+      const u = (uGrid[idx] + uGrid[idx+1] + uGrid[idx+cols] + uGrid[idx+cols+1]) * 0.25;
+      const [r, g, b] = heatmapColor(u);
+      const px0 = i*cs, py0 = j*cs;
+      const pxE = Math.min(px0+cs, w), pyE = Math.min(py0+cs, h);
+      for (let py = py0; py < pyE; py++) {
+        const ro = py * imgW;
+        for (let px = px0; px < pxE; px++) {
+          const p = (ro + px)*4;
+          data[p]=r; data[p+1]=g; data[p+2]=b; data[p+3]=255;
+        }
+      }
+    }
+  }
+  ctx.putImageData(heatmapImage, 0, 0);
+}
+
+// ═══════════════ MS 网格 ═══════════════
+
+function renderGrid() {
+  const { w, h } = getCanvasSize();
+  const cs = state.cellSize;
+  ctx.strokeStyle = 'rgba(71, 85, 105, 0.18)';
+  ctx.lineWidth = 0.5; ctx.beginPath();
+  for (let i=0; i<=cols-1; i++) { ctx.moveTo(i*cs,0); ctx.lineTo(i*cs,h); }
+  for (let j=0; j<=rows-1; j++) { ctx.moveTo(0,j*cs); ctx.lineTo(w,j*cs); }
+  ctx.stroke();
+}
+
+// ═══════════════ 等值线 ═══════════════
+
+function drawContours() {
+  const cs = state.cellSize;
+  const activeLevels = [];
+  const step = Math.max(1, 6 - state.densityLevel);
+  for (let i=0; i<allLevels.length; i+=step) {
+    activeLevels.push(allLevels[i]); activeLevels.push(-allLevels[i]);
+  }
+  document.getElementById('infoLevels').textContent = activeLevels.length;
+
+  activeLevels.forEach(lvl => {
+    const lvlNorm = Math.min(1, Math.abs(lvl)/5);
+    const alpha = state.brightness * (0.3 + 0.7*(1-lvlNorm));
+    ctx.strokeStyle = `hsla(195, 60%, ${42+38*lvlNorm}%, ${alpha})`;
+    ctx.lineWidth = 0.8 + 0.7*(1-lvlNorm);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+
+    for (let j=0; j<rows-1; j++) {
+      for (let i=0; i<cols-1; i++) {
+        const idx = j*cols + i;
+        const v00=uGrid[idx], v10=uGrid[idx+1], v01=uGrid[idx+cols], v11=uGrid[idx+cols+1];
+        let ct = 0;
+        if (v00>lvl) ct|=1; if (v10>lvl) ct|=2;
+        if (v11>lvl) ct|=4; if (v01>lvl) ct|=8;
+        const edges = edgeTable[ct];
+        if (edges.length===0) continue;
+
+        const pts = [];
+        for (let e=0; e<edges.length; e++) {
+          const edge = edges[e];
+          let px=i*cs, py=j*cs;
+          if (edge===0) px += cs*(lvl-v00)/(v10-v00);
+          else if (edge===1) { px+=cs; py+=cs*(lvl-v10)/(v11-v10); }
+          else if (edge===2) { px+=cs*(lvl-v01)/(v11-v01); py+=cs; }
+          else if (edge===3) py += cs*(lvl-v00)/(v01-v00);
+          pts.push({x:px, y:py});
+        }
+        for (let p=0; p<pts.length; p+=2) {
+          if (p+1<pts.length) { ctx.moveTo(pts[p].x, pts[p].y); ctx.lineTo(pts[p+1].x, pts[p+1].y); }
+        }
+      }
+    }
+    ctx.stroke();
+  });
+}
+
+// ═══════════════ 方向箭头 ═══════════════
+
+function drawArrows() {
+  const { w, h } = getCanvasSize();
+  const cx=w/2, cy=h/2, spacing=state.cellSize*6, alen=7;
+
+  for (let ay=spacing; ay<h; ay+=spacing) {
+    for (let ax=spacing; ax<w; ax+=spacing) {
+      const mx=ax-cx, my=-(ay-cy);
+      const r = Math.sqrt(mx*mx+my*my);
+      const nearField = state.scene==='antenna' ? state.amplitude*1.2 : state.dipoleSep*0.5;
+      if (r<nearField || r>w*0.65) continue;
+
+      const E = state.scene==='antenna'
+        ? getElectricFieldAntenna(mx, my, state.t)
+        : getElectricFieldStatic(mx, my);
+      const mag = Math.sqrt(E.x*E.x + E.y*E.y);
+      if (mag<1e-12) continue;
+
+      const alpha = 0.2 + 0.8*Math.min(1, mag/0.003);
+      const angle = Math.atan2(-E.y, E.x);
+      ctx.save(); ctx.translate(ax, ay); ctx.rotate(angle);
+      ctx.fillStyle = `rgba(190,230,250,${alpha})`; ctx.shadowBlur=0;
+      ctx.beginPath();
+      ctx.moveTo(alen*0.5,0); ctx.lineTo(-alen*0.5, alen*0.3);
+      ctx.lineTo(-alen*0.25,0); ctx.lineTo(-alen*0.5, -alen*0.3);
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+  }
+}
+
+// ═══════════════ 电荷轨迹（场景一） ═══════════════
+
+function drawChargeTraces() {
+  const { w, h } = getCanvasSize();
+  const cx=w/2, cy=h/2;
+  ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1; ctx.setLineDash([4,6]);
+  ctx.beginPath();
+  ctx.moveTo(cx-8, cy-state.amplitude); ctx.lineTo(cx+8, cy-state.amplitude);
+  ctx.moveTo(cx, cy-state.amplitude-6); ctx.lineTo(cx, cy+state.amplitude+6);
+  ctx.moveTo(cx-8, cy+state.amplitude); ctx.lineTo(cx+8, cy+state.amplitude);
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+// ═══════════════ 主动画循环 ═══════════════
+
+function animate(timestamp) {
+  if (!state.isRunning) return;
+
+  state.frameCount++;
+  if (timestamp - state.lastFpsTime >= 1000) {
+    state.currentFps = Math.round(state.frameCount*1000/(timestamp-state.lastFpsTime));
+    state.frameCount=0; state.lastFpsTime=timestamp;
+    document.getElementById('infoFps').textContent = state.currentFps;
+  }
+
+  state.t += state.dt * state.baseSpeed;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 背景点阵
+  if (state.showDotGrid) drawDotGrid();
+
+  // 物理计算
+  if (state.scene === 'antenna') {
+    computeGridAntenna();
+  } else {
+    computeGridStatic();
+    traceFieldLines(timestamp);
+  }
+
+  // 图层渲染
+  if (state.showHeatmap) renderHeatmap();
+  if (state.showGrid) renderGrid();
+  if (state.scene==='antenna' && state.showTraces) drawChargeTraces();
+  if (state.showContours) drawContours();
+  if (state.showArrows) drawArrows();
+  if (state.scene==='static') drawTraceLines(timestamp);
+
+  // 更新电荷 DOM
+  if (state.scene==='antenna') updateChargesAntenna(); else updateChargesStatic();
+
+  // 种子环可见性
+  seedRing.style.display = (state.scene==='static' && state.showSeeds) ? 'block' : 'none';
+
+  requestAnimationFrame(animate);
+}
+
+// ═══════════════ 音频 ═══════════════
+
+let audioCtx, windFilter, windGain;
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate*2, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i=0; i<d.length; i++) d[i]=Math.random()*2-1;
+  const noise = audioCtx.createBufferSource(); noise.buffer=buf; noise.loop=true;
+  windFilter = audioCtx.createBiquadFilter();
+  windFilter.type='lowpass'; windFilter.frequency.value=400; windFilter.Q.value=1;
+  windGain = audioCtx.createGain(); windGain.gain.value=0;
+  noise.connect(windFilter); windFilter.connect(windGain); windGain.connect(audioCtx.destination);
+  noise.start();
+  setInterval(()=>{
+    if (state.isRunning && document.getElementById('audioToggle').checked)
+      windFilter.frequency.setTargetAtTime(300+Math.random()*300, audioCtx.currentTime, 1.0);
+  }, 2000);
+}
+
+// ═══════════════ UI 事件 ═══════════════
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  document.getElementById('startOverlay').style.display='none';
+  initAudio(); resizeCanvas();
+  if (state.scene==='static') resetCycle();
+  state.isRunning=true; state.lastFpsTime=performance.now();
+  requestAnimationFrame(animate);
+});
+
+// 场景切换
+document.querySelectorAll('.scene-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.scene-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const ns = tab.dataset.scene;
+    if (state.scene===ns) return;
+    state.scene = ns;
+
+    const isA = ns==='antenna';
+    document.getElementById('panelAntenna').classList.toggle('hidden', !isA);
+    document.getElementById('panelStatic').classList.toggle('hidden', isA);
+    document.getElementById('rowTraces').style.display = isA?'flex':'none';
+    document.getElementById('rowSeeds').style.display = isA?'none':'flex';
+    document.getElementById('rowDotGrid').style.display = isA?'none':'flex';
+    document.getElementById('infoFormula').innerHTML = isA
+      ? '流函数 U 的等值线 = 电场线<br>E ⟂ ∇U（振荡点偶极子）'
+      : 'ψ = atan2(−2dx, x²+y²−d²)<br>等值线 = 电场线（垂直偶极子）';
+
+    if (!isA) {
+      state.showHeatmap=true; state.showDotGrid=true;
+      state.showSeeds=true; state.showContours=true;
+      document.getElementById('toggleHeatmap').checked=true;
+      document.getElementById('toggleDotGrid').checked=true;
+      document.getElementById('toggleSeeds').checked=true;
+      document.getElementById('toggleContours').checked=true;
+      document.getElementById('legendBox').classList.remove('hidden');
+      heatmapImage=null; resetCycle();
+    } else {
+      state.showHeatmap=false; state.showDotGrid=false; state.showSeeds=false;
+      document.getElementById('toggleHeatmap').checked=false;
+      document.getElementById('toggleDotGrid').checked=false;
+      document.getElementById('toggleSeeds').checked=false;
+      document.getElementById('legendBox').classList.add('hidden');
+      seedRing.style.display='none';
+    }
+    updateChargesStatic();
+  });
+});
+
+// 参数滑块
+const bindings = [
+  { id:'paramSpeed',      key:'baseSpeed',    fmt:v=>`${v}x` },
+  { id:'paramAmplitude',  key:'amplitude',    fmt:v=>v<20?'小':v>45?'大':'中' },
+  { id:'paramScale',      key:'lambda',       fmt:v=>`${Math.round(v/2)}%` },
+  { id:'paramBrightness', key:'brightness',   fmt:v=>`${Math.round(v*100)}%` },
+  { id:'paramDensity',    key:'densityLevel', fmt:v=>['稀疏','低','中','高','密集'][v-1] },
+  { id:'paramCellSize',   key:'cellSize',     fmt:v=>`${v}px` },
+  { id:'paramDipoleSep',  key:'dipoleSep',    fmt:v=>`${v}px` },
+  { id:'paramTraceCount', key:'traceCount',   fmt:v=>`${v}` },
+  { id:'paramTraceSpeed', key:'traceSpeed',   fmt:v=>`${v}x` },
+  { id:'paramStepSize',   key:'stepSize',     fmt:v=>`${v}px` },
+  { id:'paramHoldTime',   key:'holdTime',     fmt:v=>`${v}s` },
+];
+bindings.forEach(b=>{
+  const el=document.getElementById(b.id); if(!el) return;
+  const label=document.getElementById(b.id.replace('param','val'));
+  el.addEventListener('input', e=>{
+    const val=parseFloat(e.target.value); state[b.key]=val;
+    if (b.key==='cellSize') { heatmapImage=null; resizeCanvas(); }
+    if (['dipoleSep','traceCount'].includes(b.key) && state.scene==='static') {
+      resetCycle(); updateChargesStatic();
+    }
+    if (label) label.textContent=b.fmt(val);
+    if (state.scene==='antenna') updateChargesAntenna();
+  });
+});
+
+function bindToggle(id, key, extra) {
+  document.getElementById(id).addEventListener('change', e=>{
+    state[key]=e.target.checked;
+    if (extra) extra(e.target.checked);
+  });
+}
+bindToggle('toggleHeatmap', 'showHeatmap', v=>{
+  document.getElementById('legendBox').classList.toggle('hidden', !v);
+  heatmapImage=null;
+});
+bindToggle('toggleDotGrid',  'showDotGrid');
+bindToggle('toggleGrid',     'showGrid');
+bindToggle('toggleArrows',   'showArrows');
+bindToggle('toggleContours', 'showContours');
+bindToggle('toggleTraces',   'showTraces');
+bindToggle('toggleSeeds',    'showSeeds', v=>{
+  if (state.scene==='static') {
+    seedRing.style.display = v?'block':'none';
+  }
+});
+
+document.getElementById('audioToggle').addEventListener('change', e=>{
+  if (!windGain) return;
+  windGain.gain.setTargetAtTime(e.target.checked?0.5:0, audioCtx.currentTime, 0.5);
+});
+
+// 键盘
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName==='INPUT') return;
+  switch(e.key.toLowerCase()) {
+    case '1': document.querySelector('[data-scene="antenna"]').click(); break;
+    case '2': document.querySelector('[data-scene="static"]').click(); break;
+    case 'h': document.getElementById('toggleHeatmap').click(); break;
+    case 'g': document.getElementById('toggleGrid').click(); break;
+    case 'a': document.getElementById('toggleArrows').click(); break;
+    case 'c': document.getElementById('toggleContours').click(); break;
+    case 'd': document.getElementById('toggleDotGrid').click(); break;
+    case 's': document.getElementById('toggleSeeds').click(); break;
+    case 'r': if (state.scene==='static') resetCycle(); break;
+    case ' ': e.preventDefault();
+      if (state.isRunning) { state.isRunning=false; }
+      else { state.isRunning=true; state.lastFpsTime=performance.now(); requestAnimationFrame(animate); }
+      break;
+  }
+});
+
+// 初始化
+resizeCanvas();
+updateChargesAntenna();
+</script>
+</body>
+</html>

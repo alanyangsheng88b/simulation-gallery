@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDA 级天线射频仿真系统</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入科技感字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        /* 核心 CSS 变量定义 - EDA 风格调色板 */
+        :root {
+            --bg-color: #050505;
+            --panel-bg: rgba(10, 10, 12, 0.85);
+            --border-color: #1a1a24;
+            --text-main: #e2e8f0;
+            --text-muted: #64748b;
+            
+            --neon-cyan: #00ffff;
+            --neon-blue: #0088ff;
+            --neon-green: #39ff14;
+            --neon-red: #ff0055;
+            --neon-yellow: #ffdf00;
+            
+            --ui-accent: #0ea5e9;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--text-main);
+            /* 细腻的网格背景辅助线，增加 EDA 质感 */
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--ui-accent); }
+
+        /* 发光文本样式 */
+        .glow-text-cyan { text-shadow: 0 0 10px rgba(0, 255, 255, 0.7); }
+        .glow-text-green { text-shadow: 0 0 10px rgba(57, 255, 20, 0.7); }
+
+        /* 标题可编辑区域的交互反馈 */
+        [contenteditable="true"] {
+            outline: none;
+            transition: all 0.3s ease;
+            border-bottom: 1px dashed transparent;
+        }
+        [contenteditable="true"]:focus {
+            border-bottom: 1px dashed var(--neon-cyan);
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        /* 场景选择按钮样式 */
+        .scene-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid #333;
+            color: #888;
+            transition: all 0.3s;
+        }
+        .scene-btn:hover {
+            border-color: #555;
+            color: #ccc;
+        }
+        .scene-btn.active {
+            background: rgba(0, 255, 255, 0.1);
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2) inset;
+        }
+
+        /* 滑块样式 (Range Slider) */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px; width: 14px;
+            border-radius: 50%;
+            background: var(--neon-cyan);
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 0 10px var(--neon-cyan);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px;
+            cursor: pointer;
+            background: #333;
+            border-radius: 2px;
+        }
+        input[type=range]:focus { outline: none; }
+
+        /* Toggle 开关样式 */
+        .toggle-checkbox:checked { right: 0; border-color: var(--neon-cyan); }
+        .toggle-checkbox:checked + .toggle-label { background-color: rgba(0, 255, 255, 0.2); border-color: var(--neon-cyan); }
+        .toggle-checkbox:checked + .toggle-label:after { transform: translateX(100%); border-color: white; background-color: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan);}
+
+        /* 画布容器，用于支持缩放 */
+        #canvas-wrapper {
+            transition: transform 0.2s ease-out;
+            transform-origin: center center;
+        }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen w-screen text-sm">
+
+    <div id="view-area" class="relative flex-grow flex items-center justify-center overflow-hidden border-b md:border-b-0 md:border-r border-gray-800">
+        <!-- 缩放容器 -->
+        <div id="canvas-wrapper" class="relative w-full h-full flex items-center justify-center">
+            <canvas id="simCanvas"></canvas>
+        </div>
+        
+        <!-- 左下角状态提示 (只读) -->
+        <div class="absolute bottom-4 left-4 text-xs text-gray-500 font-mono tracking-widest pointer-events-none">
+            <span class="text-green-500 glow-text-green mr-2">●</span><span id="status-text">SYS.READY // RF.SIMULATION.ACTIVE</span>
+        </div>
+    </div>
+
+    <div id="control-panel" class="w-full md:w-[420px] h-1/2 md:h-full overflow-y-auto glass-panel p-6 flex flex-col gap-6 relative z-10">
+        
+        <!-- 头部标题区 -->
+        <div class="border-b border-gray-800 pb-4">
+            <h1 contenteditable="true" class="text-2xl font-bold font-['Orbitron'] text-white tracking-wide glow-text-cyan outline-none">
+                DIPOLE_ANTENNA_SIM
+            </h1>
+            <h2 contenteditable="true" class="text-xs text-gray-400 mt-2 outline-none uppercase tracking-widest">
+                Electromagnetic Transient EDA Viewer v2.1
+            </h2>
+        </div>
+
+        <!-- 分区 1：场景模式切换 -->
+        <div>
+            <div class="text-xs text-cyan-500 mb-3 uppercase tracking-wider font-bold flex items-center">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                Simulation Scenarios
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <button class="scene-btn active rounded py-2 text-xs font-bold" data-scene="1">1. 接收模式 (Rx)</button>
+                <button class="scene-btn rounded py-2 text-xs font-bold" data-scene="2">2. 发射模式 (Tx)</button>
+                <button class="scene-btn rounded py-2 text-[11px] font-bold col-span-2 text-cyan-400 border-cyan-900/50" data-scene="5">3. 阻抗匹配与能量流 (Power Flow)</button>
+                <button class="scene-btn rounded py-2 text-[11px] font-bold col-span-2 text-cyan-400 border-cyan-900/50" data-scene="6">4. 边界约束 (含示波器监测)</button>
+            </div>
+            
+            <!-- 文案剧情拆解专区 -->
+            <div class="text-[11px] text-green-500 mt-4 mb-2 uppercase tracking-wider flex items-center font-bold">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477-4.5 1.253"></path></svg>
+                Tutorial: 偶极子硬核拆解
+            </div>
+            <div class="grid grid-cols-1 gap-2">
+                <button class="scene-btn rounded py-2 text-[11px] font-bold border-green-900/50 text-green-400 hover:bg-green-900/20" data-scene="7">5. 能量转换器 (平行传输线)</button>
+                <button class="scene-btn rounded py-2 text-[11px] font-bold border-green-900/50 text-green-400 hover:bg-green-900/20" data-scene="8">6. 偶极子天线形成 (掰弯90度)</button>
+            </div>
+        </div>
+
+        <!-- 分区 2：物理量精细调节 -->
+        <div class="bg-black/30 rounded-lg p-4 border border-gray-800">
+            <div class="text-xs text-cyan-500 mb-4 uppercase tracking-wider font-bold">Physical Parameters</div>
+            
+            <div class="space-y-4">
+                <!-- 基础频率 -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-400">振荡角频率 (ω)</span>
+                        <span id="val-omega" class="text-white">0.05 rad/s</span>
+                    </div>
+                    <input type="range" id="param-omega" min="0.01" max="0.15" step="0.01" value="0.05">
+                </div>
+                
+                <!-- 激励幅度 -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-400">电磁波/源 幅度 (E₀)</span>
+                        <span id="val-amplitude" class="text-white">80 V/m</span>
+                    </div>
+                    <input type="range" id="param-amplitude" min="20" max="150" step="1" value="80">
+                </div>
+
+                <!-- 天线长度比 -->
+                <div id="group-mismatch">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-400">物理长度/谐振长度比</span>
+                        <span id="val-lengthRatio" class="text-neon-red">0.50</span>
+                    </div>
+                    <input type="range" id="param-lengthRatio" min="0.3" max="1.5" step="0.05" value="0.5">
+                    <div class="text-[10px] text-gray-500 mt-1">L/L₀=1 时 β=π/2 谐振；k=π/(2L₀)，λ=4L₀。</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分区 3：画面风格与视觉调整 -->
+        <div>
+            <div class="text-xs text-gray-500 mb-3 uppercase tracking-wider">Visual Rendering Settings</div>
+            
+            <div class="space-y-4">
+                <!-- 视口缩放 -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-400">画布视口缩放</span>
+                        <span id="val-zoom" class="text-white">100%</span>
+                    </div>
+                    <input type="range" id="render-zoom" min="50" max="120" step="5" value="100">
+                </div>
+                
+                <!-- 线条粗细 -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-400">矢量线条粗细 (Stroke)</span>
+                        <span id="val-lineWidth" class="text-white">1.5 px</span>
+                    </div>
+                    <input type="range" id="render-lineWidth" min="0.5" max="5.0" step="0.1" value="1.5">
+                </div>
+
+                <!-- 霓虹发光强度 -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-400">辉光强度 (Bloom/Glow)</span>
+                        <span id="val-bloom" class="text-neon-cyan">20 Units</span>
+                    </div>
+                    <input type="range" id="render-bloom" min="0" max="50" step="1" value="20">
+                </div>
+
+                <!-- 图层开关组 -->
+                <div class="flex flex-col gap-2 pt-2">
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="layer-grid" class="sr-only toggle-checkbox" checked>
+                            <div class="block bg-gray-800 w-10 h-6 rounded-full border border-gray-600 toggle-label transition-colors duration-300"></div>
+                            <div class="dot absolute left-1 top-1 bg-gray-400 w-4 h-4 rounded-full transition-transform duration-300"></div>
+                        </div>
+                        <div class="ml-3 text-xs text-gray-300">3D 透视投影底板网格 (Grid Layer)</div>
+                    </label>
+                    
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="layer-labels" class="sr-only toggle-checkbox" checked>
+                            <div class="block bg-gray-800 w-10 h-6 rounded-full border border-gray-600 toggle-label transition-colors duration-300"></div>
+                            <div class="dot absolute left-1 top-1 bg-gray-400 w-4 h-4 rounded-full transition-transform duration-300"></div>
+                        </div>
+                        <div class="ml-3 text-xs text-gray-300">图解文本标注 (Annotation Layer)</div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分区 4：原理解析 (根据场景动态变化) -->
+        <div class="mt-auto border-t border-gray-800 pt-4">
+            <div class="text-[11px] text-gray-400 mb-2 uppercase flex justify-between">
+                <span>Core Equations</span>
+                <span class="text-cyan-600">MATH.MODULE</span>
+            </div>
+            <div id="theory-box" class="bg-[#0a0a0a] p-3 rounded border border-gray-800 font-serif italic text-sm text-gray-300 leading-relaxed relative overflow-hidden">
+                <!-- 动态内容注入点 -->
+                <div class="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 全局状态对象 ---
+        const State = {
+            // 物理参数
+            scene: 1,           // 1: Rx, 2: Tx, 5: Mismatch, 6: Env, 7: Line, 8: Dipole
+            omega: 0.05,        // 动画角频率
+            amplitude: 80,      // 场/源幅度
+            lengthRatio: 0.5,   // 天线失配比例 (1.0 为完美半波长)
+            time: 0,            // 内部物理时间
+            bendProgress: 0,    // 折弯动画进度 (0-1)
+            targetBendProgress: 0, // 折弯目标进度
+            
+            // 渲染参数
+            zoom: 1.0,
+            lineWidth: 1.5,
+            bloom: 20,
+            showGrid: true,
+            showLabels: true,
+
+            // 几何常量（谐振时单臂 L₀ = λ/4）
+            antGap: 15,
+            antBaseLength: 180, // L₀：谐振单臂长度 (λ/4)
+            
+            // 伪3D视角轴向
+            axisWave: { x: 0.866, y: -0.3 }, // 近似 30度等轴测
+            axisAnt:  { x: 0.866, y: 0.5 },
+            axisZ:    { x: 0, y: -1 }        // 垂直高度轴
+        };
+
+        // --- 物理公式核心模块 ---
+        // 半波偶极子：单臂 L₀=λ/4，k=2π/λ=π/(2L₀)，谐振时 β=kL=π/2
+        const Physics = {
+            L0: () => State.antBaseLength,
+            armLength: () => State.antBaseLength * State.lengthRatio,
+            // k = 2π/λ，λ = 4L₀
+            k: () => Math.PI / (2 * State.antBaseLength),
+            wavelength: () => 4 * State.antBaseLength,
+            // 电长度 β = kL
+            beta: () => Physics.k() * Physics.armLength(),
+            // 馈电点 V 相对 I 的相位差：谐振 β=π/2 → 0；短于谐振 → 容性(I超前)；长于谐振 → 感性(V超前)
+            feedPhaseDiff: () => {
+                const pd = Physics.beta() - Math.PI / 2;
+                return Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pd));
+            },
+            // 辐射/接收效率：R_rad 在 β=π/2 (L=L₀=λ/4) 时最大，β→0 或 β→π 时趋于 0
+            radiationEfficiency: () => {
+                const x = Physics.beta() - Math.PI / 2;
+                return Math.max(0, Math.cos(x) ** 2);
+            },
+            receiveCoupling: () => Physics.radiationEfficiency(),
+            // 无功储能强度 ∝ |X_in|，近似 |sin(β - π/2)|
+            reactiveIntensity: () => Math.abs(Math.sin(Physics.beta() - Math.PI / 2)),
+            // I(z) ∝ sin[k(L-z)]，端点 z=L 处 I=0
+            currentSpatial: (z) => Math.sin(Physics.k() * (Physics.armLength() - z)),
+            // V(z) ∝ cos[k(L-z)]，端点 z=L 处 V 最大（开路边界）
+            voltageSpatial: (z) => Math.cos(Physics.k() * (Physics.armLength() - z)),
+            // 时间因子：I=I₀cos(ωt−Δφ)，V=V₀cos(ωt)；Δφ>0 感性(V超前I)，Δφ<0 容性(I超前V)
+            timeFactors: (phase) => {
+                const pd = Physics.feedPhaseDiff();
+                return {
+                    i: Math.cos(phase - pd),
+                    v: Math.cos(phase)
+                };
+            },
+            // 入射平面波 E(x,t) = E₀ cos(ωt - kx)
+            incidentE: (x, phase) => State.amplitude * Math.cos(phase - Physics.k() * x),
+            // Outgoing 行波 E(r,t) = E₀ cos(ωt - kr)
+            travelingE: (r, phase) => State.amplitude * Math.cos(phase - Physics.k() * r),
+            // 传输线行波 I(z,t) = I₀ cos(ωt - βz)，z 为距源端距离
+            transmissionI: (zFromSource, phase) => Math.cos(phase - Physics.k() * zFromSource),
+            // 示波器阻抗状态文字
+            impedanceStatus: () => {
+                const pd = Physics.feedPhaseDiff();
+                if (Math.abs(pd) < 0.1) return "Resonant (Matched)";
+                if (pd < 0) return "Capacitive (I leads V)";
+                return "Inductive (V leads I)";
+            }
+        };
+
+        // --- DOM 元素引用 ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('canvas-wrapper');
+        const viewArea = document.getElementById('view-area');
+        
+        // --- UI 事件绑定函数 ---
+        function bindUI() {
+            // 场景切换
+            document.querySelectorAll('.scene-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.scene-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    State.scene = parseInt(e.target.dataset.scene);
+                    State.time = 0; // 重置时间以保持动画连贯
+                    updateUIForScene();
+                });
+            });
+
+            // 物理滑块绑定
+            const bindSlider = (id, stateKey, valId, unit, isFloat = true) => {
+                const el = document.getElementById(id);
+                const valEl = document.getElementById(valId);
+                el.addEventListener('input', (e) => {
+                    let val = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value);
+                    State[stateKey] = val;
+                    valEl.textContent = val.toFixed(isFloat?2:0) + (unit ? ' ' + unit : '');
+                    if(stateKey === 'zoom') applyZoom();
+                });
+            };
+
+            bindSlider('param-omega', 'omega', 'val-omega', 'rad/s');
+            bindSlider('param-amplitude', 'amplitude', 'val-amplitude', 'V/m', false);
+            bindSlider('param-lengthRatio', 'lengthRatio', 'val-lengthRatio', 'x');
+            
+            bindSlider('render-zoom', 'zoom', 'val-zoom', '%', false);
+            bindSlider('render-lineWidth', 'lineWidth', 'val-lineWidth', 'px');
+            bindSlider('render-bloom', 'bloom', 'val-bloom', 'Units', false);
+
+            // 处理 Zoom 的特殊逻辑 (映射 50-120 到 0.5-1.2)
+            document.getElementById('render-zoom').addEventListener('input', (e) => {
+                State.zoom = parseInt(e.target.value) / 100;
+                document.getElementById('val-zoom').textContent = e.target.value + '%';
+                applyZoom();
+            });
+
+            // 图层开关
+            document.getElementById('layer-grid').addEventListener('change', e => State.showGrid = e.target.checked);
+            document.getElementById('layer-labels').addEventListener('change', e => State.showLabels = e.target.checked);
+
+        }
+
+        // --- 视图自适应与缩放 ---
+        function resize() {
+            // 获取父容器实际尺寸，避免直接使用 window，适配分屏
+            const rect = viewArea.getBoundingClientRect();
+            // 为了在高分屏下有更好的清晰度，实际画布像素倍增 (Retina处理)
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            
+            // 使用 CSS 控制显示尺寸
+            canvas.style.width = `${rect.width}px`;
+            canvas.style.height = `${rect.height}px`;
+            
+            // 归一化绘图坐标系
+            ctx.scale(dpr, dpr);
+            
+            State.cx = rect.width / 2;
+            State.cy = rect.height / 2;
+        }
+
+        function applyZoom() {
+            wrapper.style.transform = `scale(${State.zoom})`;
+        }
+
+        // --- 基于场景更新控制面板 UI 与 原理说明 ---
+        function updateUIForScene() {
+            const theoryBox = document.getElementById('theory-box');
+            const groupMismatch = document.getElementById('group-mismatch');
+            const statusText = document.getElementById('status-text');
+            
+            // 允许所有场景下调节天线长度
+            groupMismatch.style.display = 'block';
+
+            let theoryHTML = '';
+            
+            switch (State.scene) {
+                case 1:
+                    statusText.textContent = "SYS.READY // SCENE 1: Rx MODE ACTIVE";
+                    theoryHTML = `
+                        <div class="text-white font-bold mb-1">接收模式 (Rx)</div>
+                        <p class="text-xs mb-2 text-cyan-300">平面电磁波扫过天线，激发感应电动势。</p>
+                        E<sub>inc</sub>(x,t) = E<sub>0</sub> cos(ωt − kx)<br>
+                        V<sub>ind</sub> = ∫ E<sub>inc</sub> · dl，k = π/(2L<sub>0</sub>)
+                    `;
+                    break;
+                case 2:
+                    statusText.textContent = "SYS.READY // SCENE 2: Tx MODE ACTIVE";
+                    theoryHTML = `
+                        <div class="text-white font-bold mb-1">发射模式 (Tx)</div>
+                        <p class="text-xs mb-2 text-cyan-300">中心馈电点交变电压驱动电荷加速，辐射球面波。</p>
+                        I(z,t) = I<sub>0</sub> sin[k(L−|z|)] cos(ωt)<br>
+                        V(z) ∝ cos[k(L−|z|)]，谐振 L=L<sub>0</sub>=λ/4
+                    `;
+                    break;
+                case 5:
+                    statusText.textContent = "SYS.READY // SCENE 3: IMPEDANCE & POWER FLOW";
+                    theoryHTML = `
+                        <div class="text-white font-bold mb-1">阻抗匹配与能量流</div>
+                        <p class="text-xs mb-2 text-cyan-300">观察失配时的无功储能(紫晕)与有功辐射(青波)。</p>
+                        Z<sub>in</sub> = R<sub>rad</sub> + jX<sub>in</sub><br>
+                        R<sub>rad</sub> ∝ cos²(β−π/2)，β = kL = (π/2)(L/L<sub>0</sub>)
+                    `;
+                    break;
+                case 6:
+                    statusText.textContent = "SYS.READY // SCENE 4: BOUNDARY & L";
+                    theoryHTML = `
+                        <div class="text-white font-bold mb-1">边界约束与示波器监测</div>
+                        <p class="text-[11px] text-gray-300 font-sans normal-case">调整天线长度改变 β=kL，馈电点 Δφ=β−π/2；通过右上方<span class="text-neon-cyan">示波器</span>观察 V、I 相位关系。</p>
+                        <div class="mt-2 flex gap-2">
+                            <button onclick="document.getElementById('param-lengthRatio').value=0.5; State.lengthRatio=0.5; document.getElementById('val-lengthRatio').textContent='0.50'; updateUIForScene();" class="flex-1 bg-gray-800 text-xs py-1 rounded hover:bg-gray-700">短(容性)</button>
+                            <button onclick="document.getElementById('param-lengthRatio').value=1.0; State.lengthRatio=1.0; document.getElementById('val-lengthRatio').textContent='1.00'; updateUIForScene();" class="flex-1 bg-gray-800 text-xs py-1 rounded hover:bg-gray-700">半波(谐振)</button>
+                            <button onclick="document.getElementById('param-lengthRatio').value=1.5; State.lengthRatio=1.5; document.getElementById('val-lengthRatio').textContent='1.50'; updateUIForScene();" class="flex-1 bg-gray-800 text-xs py-1 rounded hover:bg-gray-700">长(感性)</button>
+                        </div>
+                    `;
+                    break;
+                case 7:
+                    statusText.textContent = "SYS.TUTORIAL // SCENE 5: TRANSMISSION LINE";
+                    State.targetBendProgress = 0;
+                    theoryHTML = `
+                        <div class="text-white font-bold mb-2">能量转换器 (平行传输线)</div>
+                        <p class="text-[11px] text-gray-300 font-sans normal-case leading-relaxed">
+                            高频交流电源驱动电荷在两条平行的传输线中振荡。<br><br>
+                            此时传输线结构紧凑，两线电流反向抵消，外部电磁场微弱，能量主要被约束在导线之间传播，尚未形成有效辐射。<br><br>
+                            可通过上方<span class="text-neon-cyan">物理参数</span>调节 ω、E₀ 及天线长度比，观察约束场强度与电流分布变化。
+                        </p>
+                    `;
+                    break;
+                case 8:
+                    statusText.textContent = "SYS.TUTORIAL // SCENE 6: DIPOLE FORMATION";
+                    State.targetBendProgress = 1;
+                    theoryHTML = `
+                        <div class="text-white font-bold mb-2">偶极子天线形成</div>
+                        <p class="text-[11px] text-gray-300 font-sans normal-case leading-relaxed">
+                            基于场景5，我们将传输线的末端<b>向外掰弯90度</b>，就得到了一个简单的半波偶极子天线。<br><br>
+                            此时，天线两臂上的电流方向一致，周围的电磁场得以有效叠加并向外辐射，实现了能量从“约束状态”到“自由空间”的转换。
+                        </p>
+                    `;
+                    break;
+            }
+            theoryBox.innerHTML = '<div class="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>' + theoryHTML;
+        }
+
+        // 辅助：设置带发光的线条样式
+        function setGlowStyle(colorHex, isFill = false) {
+            ctx.shadowBlur = State.bloom;
+            ctx.shadowColor = colorHex;
+            if(isFill) {
+                ctx.fillStyle = colorHex;
+            } else {
+                ctx.strokeStyle = colorHex;
+                ctx.lineWidth = State.lineWidth;
+            }
+        }
+        
+        // 辅助：清除发光
+        function clearGlow() {
+            ctx.shadowBlur = 0;
+        }
+
+        // 绘制 EDA 风格透视网格
+        function drawGrid() {
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(0, 100, 150, 0.15)'; // 极暗的青色
+            ctx.lineWidth = 1;
+            clearGlow();
+
+            const gridSize = 50;
+            const steps = 15;
+            
+            // 绘制沿着 Wave 轴和 Ant 轴的平行线平面
+            for (let i = -steps; i <= steps; i++) {
+                // 平行于 Wave 轴的线
+                let start1 = { 
+                    x: State.cx + i * gridSize * State.axisAnt.x - steps * gridSize * State.axisWave.x,
+                    y: State.cy + i * gridSize * State.axisAnt.y - steps * gridSize * State.axisWave.y
+                };
+                let end1 = {
+                    x: State.cx + i * gridSize * State.axisAnt.x + steps * gridSize * State.axisWave.x,
+                    y: State.cy + i * gridSize * State.axisAnt.y + steps * gridSize * State.axisWave.y
+                };
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+
+                // 平行于 Ant 轴的线
+                let start2 = {
+                    x: State.cx + i * gridSize * State.axisWave.x - steps * gridSize * State.axisAnt.x,
+                    y: State.cy + i * gridSize * State.axisWave.y - steps * gridSize * State.axisAnt.y
+                };
+                let end2 = {
+                    x: State.cx + i * gridSize * State.axisWave.x + steps * gridSize * State.axisAnt.x,
+                    y: State.cy + i * gridSize * State.axisWave.y + steps * gridSize * State.axisAnt.y
+                };
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+            }
+            ctx.stroke();
+
+            // 绘制中心坐标轴指示
+            if(State.showLabels) {
+                ctx.lineWidth = 2;
+                
+                // X 轴 (Wave)
+                ctx.beginPath();
+                ctx.strokeStyle = '#225522';
+                ctx.moveTo(State.cx, State.cy);
+                ctx.lineTo(State.cx + 100 * State.axisWave.x, State.cy + 100 * State.axisWave.y);
+                ctx.stroke();
+                ctx.fillStyle = '#44aa44';
+                ctx.font = '10px "Share Tech Mono"';
+                ctx.fillText("X (Prop)", State.cx + 110 * State.axisWave.x, State.cy + 110 * State.axisWave.y);
+
+                // Y 轴 (Antenna)
+                ctx.beginPath();
+                ctx.strokeStyle = '#225555';
+                ctx.moveTo(State.cx, State.cy);
+                ctx.lineTo(State.cx + 100 * State.axisAnt.x, State.cy + 100 * State.axisAnt.y);
+                ctx.stroke();
+                ctx.fillStyle = '#44aaaa';
+                ctx.fillText("Y (Ant)", State.cx + 110 * State.axisAnt.x, State.cy + 110 * State.axisAnt.y);
+            }
+        }
+
+        function drawAntennaStructure() {
+            const curLength = Physics.armLength();
+            const gap = State.antGap;
+            const ax = State.axisAnt.x;
+            const ay = State.axisAnt.y;
+            
+            clearGlow();
+            ctx.lineCap = 'butt';
+            
+            const isDipoleScene = (State.scene !== 7 && State.scene !== 8); 
+            
+            // 绘制金属导体天线臂 (深灰色底+亮灰色边)
+            const drawArm = (dir) => {
+                const startX = State.cx + dir * gap * ax;
+                const startY = State.cy + dir * gap * ay;
+                const endX = State.cx + dir * (gap + curLength) * ax;
+                const endY = State.cy + dir * (gap + curLength) * ay;
+
+                // 阴影边
+                ctx.strokeStyle = '#111';
+                ctx.lineWidth = 10;
+                ctx.beginPath(); ctx.moveTo(startX, startY + 5); ctx.lineTo(endX, endY + 5); ctx.stroke();
+                
+                // 主体
+                ctx.strokeStyle = '#8899aa';
+                ctx.lineWidth = 8;
+                ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
+                
+                // 高光
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(startX, startY - 2); ctx.lineTo(endX, endY - 2); ctx.stroke();
+            };
+
+            if (isDipoleScene) {
+                drawArm(1);  // 右臂
+                drawArm(-1); // 左臂
+                
+                // 绘制馈电端点提示
+                ctx.fillStyle = '#ff9900';
+                ctx.beginPath(); ctx.arc(State.cx + gap * ax, State.cy + gap * ay, 4, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(State.cx - gap * ax, State.cy - gap * ay, 4, 0, Math.PI*2); ctx.fill();
+            }
+
+            // 如果是常规发射模式，画个交流源符号
+            if(State.scene === 2 || State.scene === 5 || State.scene === 6) {
+                ctx.strokeStyle = '#ffdf00';
+                setGlowStyle('#ffdf00');
+                ctx.beginPath();
+                ctx.arc(State.cx, State.cy, 10, 0, Math.PI*2);
+                ctx.moveTo(State.cx - 5, State.cy);
+                ctx.bezierCurveTo(State.cx-2, State.cy-5, State.cx+2, State.cy+5, State.cx+5, State.cy);
+                ctx.stroke();
+                clearGlow();
+            }
+            // 如果是 Rx 模式，画个负载电阻符号
+            else if(State.scene === 1) {
+                ctx.strokeStyle = '#00ffff';
+                setGlowStyle('#00ffff');
+                ctx.beginPath();
+                ctx.moveTo(State.cx - gap*ax, State.cy - gap*ay);
+                ctx.lineTo(State.cx - gap*ax, State.cy + 30);
+                
+                // 锯齿电阻
+                let rx = State.cx - gap*ax; let ry = State.cy + 30;
+                let rW = 2 * gap * ax;
+                ctx.lineTo(rx + rW*0.1, ry + 5);
+                ctx.lineTo(rx + rW*0.3, ry - 5);
+                ctx.lineTo(rx + rW*0.5, ry + 5);
+                ctx.lineTo(rx + rW*0.7, ry - 5);
+                ctx.lineTo(rx + rW*0.9, ry + 5);
+                ctx.lineTo(rx + rW, ry);
+
+                ctx.lineTo(State.cx + gap*ax, State.cy + gap*ay);
+                ctx.stroke();
+                
+                if(State.showLabels) {
+                    ctx.fillStyle = '#00ffff';
+                    ctx.font = '12px "Share Tech Mono"';
+                    ctx.fillText("R_load", State.cx + 10, State.cy + 50);
+                }
+                clearGlow();
+            }
+
+            // --- Tutorial 场景 7 (传输线) 和 8 (折弯) 的特殊渲染 ---
+            if (State.scene === 7 || State.scene === 8) {
+                const txLen = 150;
+                
+                // 1. 绘制固定的下方传输线
+                ctx.strokeStyle = '#d97706'; // 深黄色同轴/双线
+                ctx.lineWidth = 6;
+                ctx.beginPath();
+                ctx.moveTo(State.cx + gap * ax, State.cy + gap * ay + txLen);
+                ctx.lineTo(State.cx + gap * ax, State.cy + gap * ay);
+                ctx.moveTo(State.cx - gap * ax, State.cy - gap * ay + txLen);
+                ctx.lineTo(State.cx - gap * ax, State.cy - gap * ay);
+                ctx.stroke();
+
+                // 2. 在传输线底部绘制交流电源
+                ctx.strokeStyle = '#39ff14';
+                setGlowStyle('#39ff14');
+                ctx.beginPath();
+                let sourceY = State.cy + gap * ay + txLen + 15;
+                ctx.arc(State.cx, sourceY, 15, 0, Math.PI*2);
+                ctx.moveTo(State.cx - 8, sourceY);
+                ctx.bezierCurveTo(State.cx-4, sourceY-8, State.cx+4, sourceY+8, State.cx+8, sourceY);
+                ctx.stroke();
+                
+                // 连接电源和传输线
+                ctx.beginPath();
+                ctx.moveTo(State.cx, sourceY - 15);
+                ctx.lineTo(State.cx + gap * ax, State.cy + gap * ay + txLen);
+                ctx.moveTo(State.cx, sourceY - 15);
+                ctx.lineTo(State.cx - gap * ax, State.cy - gap * ay + txLen);
+                ctx.stroke();
+                clearGlow();
+                
+                // 3. 计算并绘制可弯折的上半部分
+                const thetaR0 = -Math.PI / 2; // 垂直向上
+                const thetaR1 = Math.atan2(ay, ax); // 水平向右
+                const thetaR = thetaR0 + (thetaR1 - thetaR0) * State.bendProgress;
+                
+                const thetaL0 = -Math.PI / 2;
+                const thetaL1 = Math.atan2(-ay, -ax); // 水平向左
+                const thetaL = thetaL0 + (thetaL1 - thetaL0) * State.bendProgress;
+
+                const drawBendableArm = (startX, startY, theta, length) => {
+                    const endX = startX + length * Math.cos(theta);
+                    const endY = startY + length * Math.sin(theta);
+                    
+                    // 颜色从传输线(暗黄)过渡到天线(亮灰)
+                    const r = 217 + (136 - 217) * State.bendProgress;
+                    const g = 119 + (153 - 119) * State.bendProgress;
+                    const b = 6 + (170 - 6) * State.bendProgress;
+                    
+                    // 阴影边
+                    ctx.strokeStyle = '#111';
+                    ctx.lineWidth = 10;
+                    ctx.beginPath(); ctx.moveTo(startX, startY + 5); ctx.lineTo(endX, endY + 5); ctx.stroke();
+                    
+                    // 主体
+                    ctx.strokeStyle = `rgb(${Math.floor(r)},${Math.floor(g)},${Math.floor(b)})`;
+                    ctx.lineWidth = 8;
+                    ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
+                    
+                    // 高光
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(startX, startY - 2); ctx.lineTo(endX, endY - 2); ctx.stroke();
+                };
+
+                drawBendableArm(State.cx + gap * ax, State.cy + gap * ay, thetaR, curLength);
+                drawBendableArm(State.cx - gap * ax, State.cy - gap * ay, thetaL, curLength);
+
+                if (State.showLabels) {
+                    ctx.fillStyle = '#39ff14';
+                    ctx.font = 'bold 12px "Share Tech Mono"';
+                    ctx.fillText("AC Power Source", State.cx + 25, sourceY + 5);
+                    
+                    if (State.bendProgress > 0.8) {
+                        ctx.fillStyle = '#c084fc';
+                        ctx.font = 'bold 14px "Share Tech Mono"';
+                        ctx.fillText("Z_space = 377Ω", State.cx + curLength*ax*0.4, State.cy - 40);
+                    }
+                }
+            }
+        }
+
+        function drawFields(phase) {
+            
+            // Rx 模式：平面波从左向右传播 E = E₀ cos(ωt - kx)
+            if(State.scene === 1) {
+                setGlowStyle('#39ff14'); // 霓虹绿 电场
+                ctx.beginPath();
+                
+                let first = true;
+                const startD = -400; const endD = 400; const step = 8;
+                
+                for(let d = startD; d <= endD; d += step) {
+                    let eMag = Physics.incidentE(d, phase);
+                    
+                    let baseX = State.cx + d * State.axisWave.x;
+                    let baseY = State.cy + d * State.axisWave.y;
+                    
+                    let tipX = baseX + eMag * State.axisAnt.x;
+                    let tipY = baseY + eMag * State.axisAnt.y;
+
+                    if(first) { ctx.moveTo(tipX, tipY); first = false; } 
+                    else { ctx.lineTo(tipX, tipY); }
+
+                    // 绘制矢量箭头
+                    if(d % 32 === 0) {
+                        ctx.moveTo(baseX, baseY);
+                        ctx.lineTo(tipX, tipY);
+                        ctx.fillRect(tipX-1, tipY-1, 3, 3);
+                    }
+                }
+                ctx.stroke();
+                clearGlow();
+                
+                if(State.showLabels) {
+                    ctx.fillStyle = '#39ff14';
+                    ctx.fillText("E-Field (Incident)", State.cx - 200, State.cy - 100);
+                }
+            }
+            
+            // 场景7：传输线 TEM 约束场 E(z,t) = E₀ cos(ωt - βz)
+            if (State.scene === 7) {
+                const confinement = 1 - State.bendProgress * 0.8;
+                const trappedAmp = State.amplitude * 0.25 * confinement;
+                
+                setGlowStyle('#d97706');
+                ctx.beginPath();
+                const gap = State.antGap;
+                const ax = State.axisAnt.x;
+                const ay = State.axisAnt.y;
+                const txLen = 150;
+                const curLength = Physics.armLength();
+                const topY = State.cy + gap * ay - curLength * (1 - State.bendProgress);
+                const botY = State.cy + gap * ay + txLen;
+                
+                for (let z = 0; z <= txLen + curLength; z += 6) {
+                    const eMag = trappedAmp * Physics.transmissionI(z, phase);
+                    const lx = State.cx - gap * ax + eMag * 0.3;
+                    const rx = State.cx + gap * ax - eMag * 0.3;
+                    const py = botY - z;
+                    if (z === 0) ctx.moveTo(lx, py);
+                    else ctx.lineTo(lx, py);
+                    ctx.lineTo(rx, py);
+                }
+                ctx.stroke();
+                clearGlow();
+                
+                if (State.showLabels) {
+                    ctx.fillStyle = '#d97706';
+                    ctx.font = '11px "Share Tech Mono"';
+                    ctx.fillText("Confined E-Field", State.cx + 30, topY - 15);
+                }
+            }
+
+            // 包含水平臂的发射/辐射场景
+            if(State.scene === 2 || State.scene === 5 || State.scene === 6 || State.scene === 8) {
+                let isScene5 = (State.scene === 5);
+                let radEfficiency = Physics.radiationEfficiency();
+                let fieldColor = '#00ffff';
+                if (isScene5 || State.scene === 8) fieldColor = '#39ff14';
+                
+                let ampMultiplier = 1.0;
+                if (State.scene === 8) ampMultiplier = State.bendProgress; // 折弯后电流同向叠加，辐射渐增
+                
+                // 绘制行波 E(r,t) = E₀ cos(ωt - kr)
+                if (radEfficiency > 0.01) {
+                    setGlowStyle(fieldColor);
+                    ctx.beginPath();
+                    
+                    // 向右传播 (+r)
+                    let firstR = true;
+                    for(let d = 0; d <= 400; d += 5) {
+                        let eMag = Physics.travelingE(d, phase) * ampMultiplier * radEfficiency;
+                        let bx = State.cx + d * State.axisWave.x;
+                        let by = State.cy + d * State.axisWave.y;
+                        let tx = bx + eMag * State.axisAnt.x;
+                        let ty = by + eMag * State.axisAnt.y;
+                        if(firstR) { ctx.moveTo(tx, ty); firstR = false; } else { ctx.lineTo(tx, ty); }
+                    }
+                    // 向左传播 (-r)
+                    let firstL = true;
+                    for(let d = 0; d >= -400; d -= 5) {
+                        let eMag = Physics.travelingE(Math.abs(d), phase) * ampMultiplier * radEfficiency;
+                        let bx = State.cx + d * State.axisWave.x;
+                        let by = State.cy + d * State.axisWave.y;
+                        let tx = bx + eMag * State.axisAnt.x;
+                        let ty = by + eMag * State.axisAnt.y;
+                        if(firstL) { ctx.moveTo(tx, ty); firstL = false; } else { ctx.lineTo(tx, ty); }
+                    }
+                    ctx.stroke();
+                    clearGlow();
+                }
+
+                // 非谐振无功近场：功率 ∝ sin(2ωt)，强度 ∝ |X_in|
+                const reactMismatch = Physics.reactiveIntensity();
+                if (reactMismatch > 0.05 && (isScene5 || State.scene === 2 || State.scene === 6 || State.scene === 8)) {
+                    let reactivePulse = Math.abs(Math.sin(2 * phase));
+                    let reactRadius = 80 + 150 * reactMismatch;
+                    let reactIntensity = Math.min(1, reactMismatch * 2) * reactivePulse;
+                    
+                    if (reactIntensity > 0.01) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.ellipse(State.cx, State.cy, reactRadius, reactRadius * 0.5, Math.atan2(State.axisAnt.y, State.axisAnt.x), 0, Math.PI * 2);
+                        
+                        let grad = ctx.createRadialGradient(State.cx, State.cy, 10, State.cx, State.cy, reactRadius);
+                        grad.addColorStop(0, `rgba(168, 85, 247, ${reactIntensity * 0.7})`); // 紫色中心
+                        grad.addColorStop(1, 'rgba(168, 85, 247, 0)');
+                        
+                        ctx.fillStyle = grad;
+                        ctx.fill();
+                        
+                        if(State.showLabels) {
+                            ctx.fillStyle = `rgba(168, 85, 247, ${reactIntensity + 0.4})`;
+                            ctx.font = 'bold 12px "Share Tech Mono"';
+                            ctx.fillText("Reactive Energy (±jX)", State.cx - 75, State.cy + reactRadius * 0.5 + 20);
+                        }
+                        ctx.restore();
+                    }
+                }
+            }
+        }
+
+        function drawDistributions(phase) {
+            const curLength = Physics.armLength();
+            const isDipoleScene = (State.scene !== 7 && State.scene !== 8);
+            
+            // I(t)=I₀cos(ωt)，V(t)=V₀cos(ωt−Δφ)，谐振时 Δφ=0
+            const { i: iTime, v: vTime } = Physics.timeFactors(phase);
+            const vScale = State.amplitude * 0.8;
+            const rxCoupling = State.scene === 1 ? Physics.receiveCoupling() : 1;
+
+            // --- 绘制天线臂上的电压/电荷包络 (V(z) ∝ cos[k(L-z)]·cos(ωt−Δφ)) ---
+            const drawVoltageEnvelope = () => {
+                ctx.beginPath();
+                // 渐变填充代表正负电荷
+                let grad = ctx.createLinearGradient(0, State.cy - 100, 0, State.cy + 100);
+                grad.addColorStop(0, "rgba(255, 0, 85, 0.6)");   // 霓虹红 +
+                grad.addColorStop(1, "rgba(0, 136, 255, 0.6)");  // 霓虹蓝 -
+                
+                ctx.fillStyle = grad;
+                setGlowStyle('#ff0055'); // 红色辉光基调
+                ctx.lineWidth = State.lineWidth;
+                ctx.strokeStyle = '#ff0055';
+
+                if (isDipoleScene) {
+                    // 右臂
+                    let rFirst = true;
+                    for(let i = 0; i <= curLength; i += 2) {
+                        let z = i; 
+                        let spatialV = Physics.voltageSpatial(z);
+                        let h = vScale * spatialV * vTime * rxCoupling;
+                        
+                        let px = State.cx + (State.antGap + z) * State.axisAnt.x;
+                        let py = State.cy + (State.antGap + z) * State.axisAnt.y + h * State.axisZ.y;
+                        
+                        if(rFirst) { ctx.moveTo(px, py); rFirst = false; } else { ctx.lineTo(px, py); }
+                    }
+                    ctx.lineTo(State.cx + (State.antGap + curLength) * State.axisAnt.x, State.cy + (State.antGap + curLength) * State.axisAnt.y);
+                    ctx.lineTo(State.cx + State.antGap * State.axisAnt.x, State.cy + State.antGap * State.axisAnt.y);
+                    ctx.fill(); ctx.stroke();
+
+                    // 左臂 (极性相反)
+                    ctx.beginPath();
+                    let lFirst = true;
+                    for(let i = 0; i <= curLength; i += 2) {
+                        let z = i;
+                        let spatialV = Physics.voltageSpatial(z);
+                        let h = vScale * spatialV * (-vTime) * rxCoupling;
+                        
+                        let px = State.cx - (State.antGap + z) * State.axisAnt.x;
+                        let py = State.cy - (State.antGap + z) * State.axisAnt.y + h * State.axisZ.y;
+                        
+                        if(lFirst) { ctx.moveTo(px, py); lFirst = false; } else { ctx.lineTo(px, py); }
+                    }
+                    ctx.lineTo(State.cx - (State.antGap + curLength) * State.axisAnt.x, State.cy - (State.antGap + curLength) * State.axisAnt.y);
+                    ctx.lineTo(State.cx - State.antGap * State.axisAnt.x, State.cy - State.antGap * State.axisAnt.y);
+                    ctx.fill(); ctx.stroke();
+                } else {
+                    // 场景7、8的折弯动态包络
+                    const thetaR0 = -Math.PI / 2;
+                    const thetaR1 = Math.atan2(State.axisAnt.y, State.axisAnt.x);
+                    const thetaR = thetaR0 + (thetaR1 - thetaR0) * State.bendProgress;
+                    
+                    const thetaL0 = -Math.PI / 2;
+                    const thetaL1 = Math.atan2(-State.axisAnt.y, -State.axisAnt.x);
+                    const thetaL = thetaL0 + (thetaL1 - thetaL0) * State.bendProgress;
+                    
+                    const drawEnvelope = (startX, startY, theta, polarity) => {
+                        ctx.beginPath();
+                        let first = true;
+                        for(let z = 0; z <= curLength; z += 2) {
+                            let spatialV = Physics.voltageSpatial(z);
+                            let h = vScale * spatialV * (vTime * polarity) * rxCoupling;
+                            
+                            let px = startX + z * Math.cos(theta);
+                            let py = startY + z * Math.sin(theta) + h * State.axisZ.y;
+                            
+                            if(first) { ctx.moveTo(px, py); first = false; } else { ctx.lineTo(px, py); }
+                        }
+                        ctx.lineTo(startX + curLength * Math.cos(theta), startY + curLength * Math.sin(theta));
+                        ctx.lineTo(startX, startY);
+                        ctx.fill(); ctx.stroke();
+                    };
+
+                    drawEnvelope(State.cx + State.antGap * State.axisAnt.x, State.cy + State.antGap * State.axisAnt.y, thetaR, 1);
+                    drawEnvelope(State.cx - State.antGap * State.axisAnt.x, State.cy - State.antGap * State.axisAnt.y, thetaL, -1);
+                }
+                
+                clearGlow();
+            };
+
+            // --- 绘制电流动态指示器 (发光斑点) ---
+            const drawCurrentIndicators = () => {
+                setGlowStyle('#00ffff', true); // 霓虹青填充
+                
+                if (isDipoleScene) {
+                    const drawCurrentOnArm = (dir) => {
+                        for(let i = 10; i < curLength - 10; i += 25) {
+                            let z = i;
+                            let spatialI = Physics.currentSpatial(z);
+                            let currentMag = spatialI * iTime;
+                            let absMag = Math.abs(currentMag);
+                            
+                            if(absMag < 0.1) continue;
+
+                            let px = State.cx + dir * (State.antGap + z) * State.axisAnt.x;
+                            let py = State.cy + dir * (State.antGap + z) * State.axisAnt.y;
+                            
+                            // 绘制电流流动高亮
+                            ctx.beginPath();
+                            let flowDir = currentMag > 0 ? 1 : -1;
+                            let stretchX = flowDir * dir * absMag * 15 * State.axisAnt.x;
+                            let stretchY = flowDir * dir * absMag * 15 * State.axisAnt.y;
+                            
+                            ctx.moveTo(px - stretchX, py - stretchY);
+                            ctx.lineTo(px + stretchX, py + stretchY);
+                            ctx.strokeStyle = `rgba(0, 255, 255, ${absMag})`;
+                            ctx.lineWidth = 4;
+                            ctx.stroke();
+                            
+                            // 小圆点箭头头
+                            ctx.fillStyle = `rgba(255, 255, 255, ${absMag})`;
+                            ctx.beginPath();
+                            ctx.arc(px + stretchX, py + stretchY, 2.5, 0, Math.PI*2);
+                            ctx.fill();
+                        }
+                    };
+                    
+                    drawCurrentOnArm(1);  // 右臂
+                    drawCurrentOnArm(-1); // 左臂
+                }
+                
+                // --- 场景 7, 8：绘制垂直传输线与可弯折臂上的电流动态 ---
+                if (State.scene === 7 || State.scene === 8) {
+                    const txLen = 150;
+                    
+                    // 1. 传输线行波 I(z,t) = cos(ωt - βz)，z 为距源端（底部）的距离
+                    for (let z = 10; z < txLen; z += 20) {
+                        let currentMag = Physics.transmissionI(z, phase);
+                        let absMag = Math.abs(currentMag);
+                        if (absMag < 0.1) continue;
+                        
+                        let flowDir = currentMag > 0 ? -1 : 1; 
+                        
+                        // 右侧线
+                        let rPx = State.cx + State.antGap * State.axisAnt.x;
+                        let rPy = State.cy + State.antGap * State.axisAnt.y + txLen - z;
+                        ctx.fillStyle = `rgba(0, 255, 255, ${absMag})`;
+                        ctx.beginPath();
+                        ctx.arc(rPx, rPy + flowDir * 8, 3, 0, Math.PI*2);
+                        ctx.fill();
+                        
+                        // 左侧线（回流）
+                        let lPx = State.cx - State.antGap * State.axisAnt.x;
+                        let lPy = State.cy - State.antGap * State.axisAnt.y + txLen - z;
+                        ctx.beginPath();
+                        ctx.arc(lPx, lPy - flowDir * 8, 3, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+
+                    // 2. 可弯折臂上的电流
+                    const thetaR0 = -Math.PI / 2;
+                    const thetaR1 = Math.atan2(State.axisAnt.y, State.axisAnt.x);
+                    const thetaR = thetaR0 + (thetaR1 - thetaR0) * State.bendProgress;
+                    
+                    const thetaL0 = -Math.PI / 2;
+                    const thetaL1 = Math.atan2(-State.axisAnt.y, -State.axisAnt.x);
+                    const thetaL = thetaL0 + (thetaL1 - thetaL0) * State.bendProgress;
+                    
+                    const drawCurrentOnBendableArm = (startX, startY, theta, dirSign) => {
+                        for(let z = 10; z < curLength - 10; z += 25) {
+                            let spatialI = Physics.currentSpatial(z);
+                            let currentMag = spatialI * iTime * dirSign;
+                            let absMag = Math.abs(currentMag);
+                            if(absMag < 0.1) continue;
+                            
+                            let px = startX + z * Math.cos(theta);
+                            let py = startY + z * Math.sin(theta);
+                            
+                            let flowDir = currentMag > 0 ? 1 : -1;
+                            let stretchX = flowDir * absMag * 15 * Math.cos(theta);
+                            let stretchY = flowDir * absMag * 15 * Math.sin(theta);
+                            
+                            ctx.beginPath();
+                            ctx.moveTo(px - stretchX, py - stretchY);
+                            ctx.lineTo(px + stretchX, py + stretchY);
+                            ctx.strokeStyle = `rgba(0, 255, 255, ${absMag})`;
+                            ctx.lineWidth = 4;
+                            ctx.stroke();
+                            
+                            ctx.fillStyle = `rgba(255, 255, 255, ${absMag})`;
+                            ctx.beginPath();
+                            ctx.arc(px + stretchX, py + stretchY, 2.5, 0, Math.PI*2);
+                            ctx.fill();
+                        }
+                    };
+
+                    drawCurrentOnBendableArm(State.cx + State.antGap * State.axisAnt.x, State.cy + State.antGap * State.axisAnt.y, thetaR, 1);
+                    drawCurrentOnBendableArm(State.cx - State.antGap * State.axisAnt.x, State.cy - State.antGap * State.axisAnt.y, thetaL, -1);
+                }
+                clearGlow();
+            };
+
+            drawVoltageEnvelope();
+            drawCurrentIndicators();
+            
+            // 绘制端点电荷极性符号 (动态跟踪末端位置)
+            if(Math.abs(vTime) > 0.3) {
+                ctx.font = 'bold 24px "Share Tech Mono"';
+                let signR = vTime > 0 ? "+" : "-";
+                let signL = vTime > 0 ? "-" : "+";
+                let colR = vTime > 0 ? "#ff0055" : "#0088ff";
+                let colL = vTime > 0 ? "#0088ff" : "#ff0055";
+                
+                let rx, ry, lx, ly;
+                if (isDipoleScene) {
+                    rx = State.cx + (State.antGap + curLength + 10) * State.axisAnt.x;
+                    ry = State.cy + (State.antGap + curLength + 10) * State.axisAnt.y;
+                    lx = State.cx - (State.antGap + curLength + 20) * State.axisAnt.x;
+                    ly = State.cy - (State.antGap + curLength + 10) * State.axisAnt.y;
+                } else {
+                    const thetaR0 = -Math.PI / 2;
+                    const thetaR1 = Math.atan2(State.axisAnt.y, State.axisAnt.x);
+                    const thetaR = thetaR0 + (thetaR1 - thetaR0) * State.bendProgress;
+                    
+                    const thetaL0 = -Math.PI / 2;
+                    const thetaL1 = Math.atan2(-State.axisAnt.y, -State.axisAnt.x);
+                    const thetaL = thetaL0 + (thetaL1 - thetaL0) * State.bendProgress;
+                    
+                    rx = State.cx + State.antGap * State.axisAnt.x + (curLength + 15) * Math.cos(thetaR);
+                    ry = State.cy + State.antGap * State.axisAnt.y + (curLength + 15) * Math.sin(thetaR);
+                    lx = State.cx - State.antGap * State.axisAnt.x + (curLength + 20) * Math.cos(thetaL);
+                    ly = State.cy - State.antGap * State.axisAnt.y + (curLength + 15) * Math.sin(thetaL);
+                }
+                
+                ctx.fillStyle = colR;
+                ctx.fillText(signR, rx, ry);
+                
+                ctx.fillStyle = colL;
+                ctx.fillText(signL, lx, ly);
+            }
+        }
+
+        function drawOscilloscope(phase) {
+            if (State.scene !== 6) return;
+            
+            const w = 280;
+            const h = 160;
+            const ox = canvas.width / (window.devicePixelRatio || 1) - w - 40; 
+            const oy = 40;
+            
+            // 背景板
+            ctx.fillStyle = 'rgba(5, 10, 5, 0.85)';
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.fillRect(ox, oy, w, h);
+            ctx.strokeRect(ox, oy, w, h);
+            
+            // 示波器网格
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(57, 255, 20, 0.15)';
+            ctx.lineWidth = 1;
+            for(let i=1; i<10; i++) {
+                ctx.moveTo(ox + (w/10)*i, oy); ctx.lineTo(ox + (w/10)*i, oy + h);
+                ctx.moveTo(ox, oy + (h/10)*i); ctx.lineTo(ox + w, oy + (h/10)*i);
+            }
+            ctx.stroke();
+            
+            // 中心基准线
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(57, 255, 20, 0.4)';
+            ctx.moveTo(ox, oy + h/2); ctx.lineTo(ox + w, oy + h/2);
+            ctx.stroke();
+
+            // 根据电长度 β 决定 V-I 相位差：Δφ = β − π/2
+            let phaseDiff = Physics.feedPhaseDiff();
+            
+            ctx.save();
+            ctx.rect(ox, oy, w, h);
+            ctx.clip();
+
+            const drawWave = (color, offset, label, labelY, dash = []) => {
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.setLineDash(dash);
+                for(let x=0; x<=w; x+=2) {
+                    let t = phase + x * Physics.k() * 0.5;
+                    let val = Math.sin(t + offset);
+                    let py = oy + h/2 - val * (h/3);
+                    if(x===0) ctx.moveTo(ox+w-x, py);
+                    else ctx.lineTo(ox+w-x, py);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                ctx.fillStyle = color;
+                ctx.font = 'bold 12px "Share Tech Mono"';
+                ctx.fillText(label, ox + 10, oy + labelY);
+            };
+
+            drawWave('#00ffff', 0, 'I_in (Current)', 20, []);
+            drawWave('#ff0055', phaseDiff, 'V_in (Voltage)', 40, [4, 2]);
+            
+            ctx.restore();
+            
+            // 标题与状态
+            ctx.fillStyle = '#39ff14';
+            ctx.font = 'bold 12px "Share Tech Mono"';
+            ctx.fillText("FEED POINT OSCILLOSCOPE", ox + w/2 - 80, oy - 10);
+            
+            ctx.fillStyle = '#aaa';
+            ctx.fillText("Status: " + Physics.impedanceStatus(), ox + 10, oy + h - 10);
+        }
+
+        function animate() {
+            State.time += State.omega;
+            if(State.time > Math.PI * 2 * 1000) State.time = 0;
+            
+            // 处理折弯动画平滑插值
+            if (State.bendProgress !== State.targetBendProgress) {
+                State.bendProgress += (State.targetBendProgress - State.bendProgress) * 0.1;
+                if (Math.abs(State.bendProgress - State.targetBendProgress) < 0.005) {
+                    State.bendProgress = State.targetBendProgress;
+                }
+            }
+            
+            const phase = State.time;
+
+            // 清除画布 (纯黑底色)
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+
+            // 1. 底层：透视网格
+            if(State.showGrid) drawGrid();
+
+            // 2. 中层：电磁波场
+            drawFields(phase);
+
+            // 3. 上层：天线物理结构
+            drawAntennaStructure();
+
+            // 4. 顶层：电压电流分布及包络
+            drawDistributions(phase);
+            
+            // 5. 示波器UI层
+            drawOscilloscope(phase);
+
+            ctx.restore();
+            requestAnimationFrame(animate);
+        }
+
+        function init() {
+            window.addEventListener('resize', resize);
+            bindUI();
+            resize();
+            updateUIForScene();
+            animate();
+            
+            wrapper.style.transform = "scale(0.9)";
+            setTimeout(() => {
+                wrapper.style.transition = "transform 1s cubic-bezier(0.1, 1, 0.1, 1)";
+                wrapper.style.transform = "scale(1.0)";
+            }, 100);
+        }
+
+        // 页面加载完成后执行
+        window.onload = init;
+
+    </script>
+</body>
+</html>

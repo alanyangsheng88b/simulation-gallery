@@ -118,5 +118,65 @@
     "tags": ["电路", "EDA", "SPICE", "MNA", "React"],
     "path": "sims/circuit/index.html",
     "version": "1.0"
+  },
+  {
+    "id": "dipole-antenna-4",
+    "category": "antenna",
+    "title": "EDA 级天线射频仿真系统",
+    "titleEn": "EDA-Grade Antenna RF Simulation",
+    "description": "端到端天线射频仿真系统：S参数分析、阻抗匹配、驻波比计算与辐射效率评估",
+    "tags": ["天线", "射频", "S参数", "阻抗匹配", "EDA"],
+    "path": "sims/antenna/偶极子天线4.html",
+    "version": "1.0"
+  },
+  {
+    "id": "dipole-antenna-eda",
+    "category": "antenna",
+    "title": "天线偶极子 EDA 仿真系统",
+    "titleEn": "Dipole Antenna EDA Simulation",
+    "description": "EDA风格偶极子天线设计与分析工具，可视化天线电流分布与方向图",
+    "tags": ["偶极子", "天线设计", "电流分布", "方向图"],
+    "path": "sims/antenna/偶极子天线辐射方向.html",
+    "version": "1.0"
+  },
+  {
+    "id": "em-dipole-field-2",
+    "category": "antenna",
+    "title": "EDA 电磁偶极天线辐射场仿真器",
+    "titleEn": "EDA EM Dipole Radiation Field Simulator",
+    "description": "电磁偶极天线近场与远场辐射仿真，包含场强分布与极化分析",
+    "tags": ["电磁偶极", "辐射场", "近场", "远场", "极化"],
+    "path": "sims/antenna/偶极子电磁波2.html",
+    "version": "1.0"
+  },
+  {
+    "id": "dipole-e-field-lines",
+    "category": "antenna",
+    "title": "偶极子电场线 — 生成过程全可视化",
+    "titleEn": "Dipole E-Field Lines — Full Generation Visualization",
+    "description": "逐步展示偶极子电场线从电荷分离到稳态的完整生成过程，直观理解电场本质",
+    "tags": ["电场线", "偶极子", "电荷", "生成过程", "可视化"],
+    "path": "sims/antenna/偶极子电磁波3.html",
+    "version": "1.0"
+  },
+  {
+    "id": "phased-array-radar",
+    "category": "antenna",
+    "title": "相控阵天线波束赋形仿真",
+    "titleEn": "Phased Array Beamforming Simulation",
+    "description": "相控阵雷达波束赋形仿真：阵元相位控制、波束扫描、方向图合成与栅瓣分析",
+    "tags": ["相控阵", "波束赋形", "雷达", "相位控制", "方向图合成"],
+    "path": "sims/antenna/相控阵雷达.html",
+    "version": "1.0"
+  },
+  {
+    "id": "vector-magnetic-potential",
+    "category": "antenna",
+    "title": "矢量磁位 & 偶极子辐射场仿真",
+    "titleEn": "Vector Magnetic Potential & Dipole Radiation",
+    "description": "基于矢量磁位 A 推导偶极子辐射场，可视化磁矢势、电场与磁场的完备关系",
+    "tags": ["矢量磁位", "磁矢势", "辐射场", "偶极子", "EDA"],
+    "path": "sims/antenna/矢量磁位.html",
+    "version": "1.0"
   }
 ]

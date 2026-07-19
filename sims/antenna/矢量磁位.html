@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>矢量磁位 & 偶极子辐射场仿真 (EDA风格)</title>
+    <style>
+        :root {
+            /* 科技感 EDA 配色系统 */
+            --bg-color: #05050a;
+            --panel-bg: rgba(15, 20, 30, 0.85);
+            --panel-border: #1a2a40;
+            --text-main: #e0e6ed;
+            --text-dim: #708090;
+            --cyan: #00f2fe;      /* 磁场 H */
+            --orange: #ffaa00;    /* 矢量 A 正向 / 标量电位 + */
+            --magenta: #ff007f;   /* 电场 E */
+            --green: #39ff14;     /* 示波器波形 */
+            --blue: #0066ff;      /* 矢量 A 负向 / 标量电位 - */
+            --grid-color: rgba(0, 242, 254, 0.15);
+            --hl-bg: rgba(0, 242, 254, 0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            font-size: 14px;
+        }
+
+        /* 布局控制：全局响应式 */
+        #app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            flex-direction: row;
+        }
+        @media (max-width: 1024px) {
+            #app-container { flex-direction: column; }
+            #control-panel { height: 40vh; border-left: none; border-top: 1px solid var(--panel-border); }
+            #canvas-container { height: 60vh; }
+        }
+
+        /* 左侧动画区 */
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            background: radial-gradient(circle at center, #111520 0%, #05050a 100%);
+            overflow: hidden;
+        }
+        canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+        canvas:active { cursor: grabbing; }
+
+        /* HUD 通用样式 */
+        .hud-panel {
+            position: absolute;
+            background: rgba(10, 15, 20, 0.7);
+            border: 1px solid var(--panel-border);
+            border-radius: 4px;
+            backdrop-filter: blur(4px);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+        .hud-header {
+            background: rgba(26, 42, 64, 0.8);
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--cyan);
+            cursor: move;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+        }
+        .hud-content { padding: 10px; flex-grow: 1; }
+
+        /* 遥测面板 */
+        #hud-telemetry { top: 20px; left: 20px; width: 220px; }
+        .telemetry-item {
+            display: flex; justify-content: space-between; margin-bottom: 5px; font-family: monospace;
+        }
+        .telemetry-val { color: var(--green); }
+
+        /* 示波器 */
+        #hud-scope { bottom: 20px; right: 20px; width: 300px; height: 180px; }
+        #scope-canvas { width: 100%; height: 100%; background: #000; border: 1px solid #333; }
+        .scope-legend { display: flex; gap: 10px; font-size: 10px; margin-bottom: 5px; }
+        .legend-item span { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 50%; }
+
+        /* 右侧控制面板 */
+        #control-panel {
+            width: 350px;
+            min-width: 300px;
+            background: var(--panel-bg);
+            border-left: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+            z-index: 20;
+        }
+
+        .panel-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--panel-border);
+            background: linear-gradient(180deg, rgba(26,42,64,0.5) 0%, transparent 100%);
+        }
+        .panel-header h1 {
+            font-size: 18px;
+            color: var(--cyan);
+            text-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+            margin-bottom: 5px;
+            outline: none;
+        }
+        .panel-header p { font-size: 12px; color: var(--text-dim); outline: none; }
+
+        .panel-scroll { flex-grow: 1; overflow-y: auto; padding: 15px; }
+        .panel-scroll::-webkit-scrollbar { width: 6px; }
+        .panel-scroll::-webkit-scrollbar-thumb { background: #334; border-radius: 3px; }
+
+        .section-title {
+            font-size: 12px; color: #aaa; text-transform: uppercase; margin: 15px 0 10px; border-left: 3px solid var(--cyan); padding-left: 8px; letter-spacing: 1px;
+        }
+
+        /* 按钮组 */
+        .btn-group { display: flex; flex-wrap: wrap; gap: 8px; }
+        .btn {
+            background: #111a26; border: 1px solid var(--panel-border); color: var(--text-main);
+            padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; flex: 1 1 45%;
+            transition: all 0.2s; text-align: center;
+        }
+        .btn:hover { background: #1a2a40; border-color: var(--cyan); }
+        .btn.active { background: var(--hl-bg); border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 8px rgba(0,242,254,0.3) inset; }
+
+        /* 滑块 */
+        .control-group { margin-bottom: 12px; }
+        .control-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%;
+            background: var(--cyan); cursor: pointer; margin-top: -5px; box-shadow: 0 0 5px var(--cyan);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 2px; cursor: pointer; background: #334; border-radius: 1px;
+        }
+
+        /* 开关 */
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;}
+        .checkbox-group input { cursor: pointer; accent-color: var(--cyan); }
+
+        /* 公式区 */
+        .formula-box {
+            background: #0a0f18; border: 1px dashed #334; padding: 10px; border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace; font-size: 11px; line-height: 1.5; color: var(--text-dim);
+            margin-top: 5px;
+        }
+        .formula-hl { color: var(--cyan); font-weight: bold; }
+
+        .footer { padding: 10px; text-align: center; font-size: 10px; color: #556; border-top: 1px solid var(--panel-border); }
+
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <!-- 左侧渲染区 -->
+    <div id="canvas-container">
+        <canvas id="render-canvas"></canvas>
+        
+        <!-- HUD 遥测 -->
+        <div id="hud-telemetry" class="hud-panel">
+            <div class="hud-header">
+                <span>[SYS] TELEMETRY</span>
+                <span style="cursor:pointer;" onclick="this.parentElement.parentElement.style.display='none'">×</span>
+            </div>
+            <div class="hud-content">
+                <div class="telemetry-item"><span>FPS</span><span id="tel-fps" class="telemetry-val">60</span></div>
+                <div class="telemetry-item"><span>Phase (ωt)</span><span id="tel-phase" class="telemetry-val">0.00 rad</span></div>
+                <div class="telemetry-item"><span>Current I(t)</span><span id="tel-current" class="telemetry-val">0.00 A</span></div>
+                <div class="telemetry-item"><span>Wavenumber (k)</span><span id="tel-k" class="telemetry-val">0.50 m⁻¹</span></div>
+                <div class="telemetry-item"><span>Cam Pitch</span><span id="tel-pitch" class="telemetry-val">0.60</span></div>
+                <div class="telemetry-item"><span>Cam Yaw</span><span id="tel-yaw" class="telemetry-val">0.78</span></div>
+            </div>
+        </div>
+
+        <!-- 示波器 -->
+        <div id="hud-scope" class="hud-panel">
+            <div class="hud-header">
+                <span>[WAV] OSCILLOSCOPE</span>
+                <span style="cursor:pointer;" onclick="this.parentElement.parentElement.style.display='none'">×</span>
+            </div>
+            <div class="hud-content" style="display:flex; flex-direction:column;">
+                <div class="scope-legend">
+                    <div class="legend-item"><span style="background:var(--orange)"></span>I(t) 源电流</div>
+                    <div class="legend-item"><span style="background:var(--cyan)"></span>远端物理场效应</div>
+                </div>
+                <canvas id="scope-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧控制面板 -->
+    <div id="control-panel">
+        <div class="panel-header">
+            <h1 contenteditable="true" spellcheck="false">电磁辐射：矢量磁位 A</h1>
+            <p contenteditable="true" spellcheck="false">Maxwell方程组推迟势可视化引擎</p>
+        </div>
+        
+        <div class="panel-scroll">
+            <div class="section-title">1. 观测场景切换</div>
+            <div class="btn-group">
+                <div class="btn active" data-scene="1" onclick="setScene(1)">仅矢量磁位 A</div>
+                <div class="btn" data-scene="2" onclick="setScene(2)">A 与 磁场 H</div>
+                <div class="btn" data-scene="3" onclick="setScene(3)">A 与 电场 E</div>
+                <div class="btn" data-scene="5" onclick="setScene(5)">标量电位 Φ</div>
+                <div class="btn" data-scene="6" onclick="setScene(6)">A 与 Φ 统一图景</div>
+                <div class="btn" data-scene="4" onclick="setScene(4)">全场综合视图</div>
+            </div>
+
+            <div class="section-title">2. 物理参量调节</div>
+            <div class="control-group">
+                <div class="control-label"><span>振荡频率 (ω)</span><span id="val-omega">0.10</span></div>
+                <input type="range" id="ctrl-omega" min="0.01" max="0.3" step="0.01" value="0.10">
+            </div>
+            <div class="control-group">
+                <div class="control-label"><span>波数/空间频率 (k)</span><span id="val-k">0.30</span></div>
+                <input type="range" id="ctrl-k" min="0.1" max="1.0" step="0.05" value="0.30">
+            </div>
+            <div class="control-group">
+                <div class="control-label"><span>天线辐射功率 (Amp)</span><span id="val-amp">100</span></div>
+                <input type="range" id="ctrl-amp" min="20" max="250" step="10" value="100">
+            </div>
+
+            <div class="section-title">3. 渲染管线配置</div>
+            <div class="control-group">
+                <div class="control-label"><span>视口缩放 (Zoom)</span><span id="val-zoom">80%</span></div>
+                <input type="range" id="ctrl-zoom" min="0.3" max="2.0" step="0.1" value="0.8">
+            </div>
+            <div class="control-group">
+                <div class="control-label"><span>线宽 (LineWidth)</span><span id="val-lw">1.5 ft</span></div>
+                <input type="range" id="ctrl-lw" min="0.5" max="5.0" step="0.5" value="1.5">
+            </div>
+            <div class="control-group">
+                <div class="control-label"><span>霓虹发光 (Bloom)</span><span id="val-bloom">8 px</span></div>
+                <input type="range" id="ctrl-bloom" min="0" max="30" step="1" value="8">
+            </div>
+
+            <div class="section-title">图层开关</div>
+            <label class="checkbox-group"><input type="checkbox" id="layer-grid" checked> 3D 透视参考网格 (适应坐标面)</label>
+            <label class="checkbox-group"><input type="checkbox" id="layer-hud" checked> HUD 遥测覆层</label>
+
+            <div class="section-title">物理机制审核</div>
+            <div class="formula-box" id="formula-display">
+                <!-- 动态更新 -->
+            </div>
+        </div>
+        
+        <div class="footer">
+            Core Engine: Vanilla JS Canvas 2D Pseudo-3D<br>
+            Strict Maxwell's Equations Compliance
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 严谨工程师模式：基于 Canvas 2D 的轻量级物理场 3D 渲染引擎
+ * 设计原则：
+ * 1. 数据驱动：物理状态与渲染管线分离。
+ * 2. 性能优先：批量路径绘制，减少上下文切换，受控的发光计算。
+ * 3. 证据溯源：参数直接映射至物理公式 (推迟势 A & 标量势 Φ)。
+ */
+
+'use strict';
+
+// ================= 系统配置与状态 =================
+const CONFIG = {
+    colors: {
+        aPos: '#ffaa00',   // A场正向（上）/ Φ正电位
+        aNeg: '#0066ff',   // A场负向（下）/ Φ负电位
+        hField: '#00f2fe', // H场
+        eField: '#ff007f', // E场
+        grid: 'rgba(0, 242, 254, 0.18)'
+    },
+    gridSize: 20, // 场渲染网格大小 (-20 to 20)
+    gridStep: 2
+};
+
+const State = {
+    time: 0,
+    omega: 0.1,    // 角频率
+    k: 0.3,        // 波数 (2π/λ)
+    amp: 100,      // 振幅
+    zoom: 0.8,
+    lineWidth: 1.5,
+    bloom: 8,
+    scene: 1,      // 1:A, 2:A+H, 3:A+E, 4:All, 5:Phi
+    layers: { grid: true, hud: true },
+    camera: { pitch: 0.6, yaw: Math.PI / 4, distance: 1 } // 伪3D相机状态
+};
+
+// ================= DOM 元素绑定 =================
+const canvas = document.getElementById('render-canvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // 优化性能
+const scopeCanvas = document.getElementById('scope-canvas');
+const scopeCtx = scopeCanvas.getContext('2d');
+
+let cw, ch;
+function resizeCanvas() {
+    cw = canvas.clientWidth; ch = canvas.clientHeight;
+    canvas.width = cw; canvas.height = ch;
+    // 示波器分辨率
+    scopeCanvas.width = scopeCanvas.clientWidth * 2; // 抗锯齿
+    scopeCanvas.height = scopeCanvas.clientHeight * 2;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// ================= 3D 投影核心 (无外部依赖) =================
+/**
+ * 将 3D 空间坐标映射到 2D 屏幕画布
+ * 基于简单的欧拉角旋转 (Yaw -> Pitch)
+ */
+function project3D(x, y, z) {
+    // 1. 绕 Z 轴旋转 (Yaw)
+    let x1 = x * Math.cos(State.camera.yaw) - y * Math.sin(State.camera.yaw);
+    let y1 = x * Math.sin(State.camera.yaw) + y * Math.cos(State.camera.yaw);
+    
+    // 2. 绕 X 轴旋转 (Pitch)
+    let y2 = y1 * Math.cos(State.camera.pitch) - z * Math.sin(State.camera.pitch);
+    let z2 = y1 * Math.sin(State.camera.pitch) + z * Math.cos(State.camera.pitch);
+    
+    // 3. 投影到屏幕 (正交投影带全局缩放)
+    const scale = 15 * State.zoom * State.camera.distance;
+    return {
+        u: cw / 2 + x1 * scale,
+        v: ch / 2 - y2 * scale, // 屏幕 Y 轴向下，物理 Z 轴向上
+        depth: z2 // 用于深度排序(简化版)
+    };
+}
+
+// ================= 相机交互 (鼠标拖拽) =================
+let isDraggingCamera = false;
+let lastMouseX = 0, lastMouseY = 0;
+
+canvas.addEventListener('mousedown', (e) => { isDraggingCamera = true; lastMouseX = e.clientX; lastMouseY = e.clientY; });
+window.addEventListener('mouseup', () => { isDraggingCamera = false; });
+window.addEventListener('mousemove', (e) => {
+    if (!isDraggingCamera) return;
+    const dx = e.clientX - lastMouseX;
+    const dy = e.clientY - lastMouseY;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    
+    State.camera.yaw += dx * 0.01;
+    State.camera.pitch += dy * 0.01;
+    // 约束 Pitch 视角，避免翻转
+    State.camera.pitch = Math.max(-0.2, Math.min(Math.PI/2 - 0.1, State.camera.pitch));
+    
+    updateHUDValues();
+});
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    State.zoom -= e.deltaY * 0.001;
+    State.zoom = Math.max(0.3, Math.min(2.0, State.zoom));
+    document.getElementById('ctrl-zoom').value = State.zoom;
+    document.getElementById('val-zoom').innerText = (State.zoom*100).toFixed(0) + '%';
+});
+
+// ================= HUD 拖拽逻辑 =================
+function setupDraggable(hudId) {
+    const el = document.getElementById(hudId);
+    const header = el.querySelector('.hud-header');
+    let isDragging = false, startX, startY, initX, initY;
+    
+    header.addEventListener('mousedown', (e) => {
+        isDragging = true; startX = e.clientX; startY = e.clientY;
+        initX = el.offsetLeft; initY = el.offsetTop;
+        el.style.zIndex = 100; // 置顶
+    });
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        el.style.left = (initX + e.clientX - startX) + 'px';
+        el.style.top = (initY + e.clientY - startY) + 'px';
+    });
+    window.addEventListener('mouseup', () => { isDragging = false; el.style.zIndex = 10; });
+}
+setupDraggable('hud-telemetry');
+setupDraggable('hud-scope');
+
+// ================= 物理渲染引擎 =================
+
+// 设置发光特效
+function setGlow(color, blur) {
+    if(blur > 0) {
+        ctx.shadowBlur = blur;
+        ctx.shadowColor = color;
+    } else {
+        ctx.shadowBlur = 0;
+    }
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+}
+
+// 绘制底面参考网格 (根据场景自动适配)
+function drawGrid() {
+    ctx.lineWidth = 1;
+    setGlow('transparent', 0); // 网格不发光提升性能
+    ctx.strokeStyle = CONFIG.colors.grid;
+    ctx.beginPath();
+    const limit = CONFIG.gridSize;
+
+    if (State.scene === 5 || State.scene === 6) {
+        // 展示垂直纵向分布，网格智能切换为 y=0 的垂直坐标剖面
+        for (let i = -limit; i <= limit; i += CONFIG.gridStep * 2) {
+            let p1 = project3D(i, 0, -limit); let p2 = project3D(i, 0, limit);
+            ctx.moveTo(p1.u, p1.v); ctx.lineTo(p2.u, p2.v);
+            p1 = project3D(-limit, 0, i); p2 = project3D(limit, 0, i);
+            ctx.moveTo(p1.u, p1.v); ctx.lineTo(p2.u, p2.v);
+        }
+    } 
+    if (State.scene !== 5) {
+        // 绘制 z=0 的赤道参考平面网格（场景6时将两者正交叠加以锚定 3D 空间）
+        for (let i = -limit; i <= limit; i += CONFIG.gridStep * 2) {
+            let p1 = project3D(i, -limit, 0); let p2 = project3D(i, limit, 0);
+            ctx.moveTo(p1.u, p1.v); ctx.lineTo(p2.u, p2.v);
+            p1 = project3D(-limit, i, 0); p2 = project3D(limit, i, 0);
+            ctx.moveTo(p1.u, p1.v); ctx.lineTo(p2.u, p2.v);
+        }
+    }
+    ctx.stroke();
+}
+
+// 绘制中心振荡电偶极子
+function drawDipole(current) {
+    const len = 4;
+    const pTop = project3D(0, 0, len);
+    const pBot = project3D(0, 0, -len);
+    
+    ctx.lineWidth = State.lineWidth * 2;
+    // 颜色随电流方向改变
+    const color = current > 0 ? CONFIG.colors.aPos : CONFIG.colors.aNeg;
+    setGlow(color, State.bloom * 2);
+    
+    ctx.beginPath();
+    ctx.moveTo(pBot.u, pBot.v);
+    ctx.lineTo(pTop.u, pTop.v);
+    ctx.stroke();
+
+    // 两端电极节点
+    ctx.beginPath();
+    ctx.arc(pTop.u, pTop.v, 3, 0, Math.PI*2);
+    ctx.arc(pBot.u, pBot.v, 3, 0, Math.PI*2);
+    ctx.fill();
+}
+
+/**
+ * 绘制核心物理量：矢量磁位 A
+ * 模型：A_z = (Amp / R) * cos(ωt - kR)
+ * 表现：空间铺满 z 向箭头，幅度随 R 衰减，形成扩散波纹
+ */
+function drawVectorA() {
+    ctx.lineWidth = State.lineWidth;
+    
+    // 为了性能，对线段按颜色(正/负)进行分批绘制
+    ctx.beginPath();
+    const posPath = new Path2D();
+    const negPath = new Path2D();
+
+    const limit = CONFIG.gridSize;
+    const step = CONFIG.gridStep;
+    
+    for (let x = -limit; x <= limit; x += step) {
+        for (let y = -limit; y <= limit; y += step) {
+            if (x===0 && y===0) continue; // 跳过原点
+
+            // 严谨物理计算：R 为到原点的距离
+            const R = Math.sqrt(x*x + y*y); 
+            // 推迟势公式：A(r,t) ∝ cos(ωt - kR) / R
+            const phase = State.omega * State.time - State.k * R;
+            // 为视觉效果，加入非线性衰减避免中心过亮，远端过暗
+            const visualAttenuation = 1 / (1 + R*0.1); 
+            const Az = (State.amp / 20) * visualAttenuation * Math.cos(phase);
+            
+            const pBase = project3D(x, y, 0);
+            const pTip = project3D(x, y, Az);
+
+            if (Az > 0) {
+                posPath.moveTo(pBase.u, pBase.v); posPath.lineTo(pTip.u, pTip.v);
+            } else {
+                negPath.moveTo(pBase.u, pBase.v); negPath.lineTo(pTip.u, pTip.v);
+            }
+        }
+    }
+
+    // 批量渲染上向箭头
+    setGlow(CONFIG.colors.aPos, State.bloom);
+    ctx.stroke(posPath);
+    // 批量渲染下向箭头
+    setGlow(CONFIG.colors.aNeg, State.bloom);
+    ctx.stroke(negPath);
+}
+
+/**
+ * 绘制磁场 H (漩涡切线 = H = ∇×A)
+ * 在理想垂直偶极子中，H 仅有 φ 分量，表现为水平面上的同心圆环
+ */
+function drawMagneticH() {
+    ctx.lineWidth = State.lineWidth * 1.5;
+    setGlow(CONFIG.colors.hField, State.bloom);
+    
+    const maxR = CONFIG.gridSize;
+    // 绘制随时间扩散的环
+    for (let i = 0; i < 4; i++) {
+        // 让环向外扩散：半径随时间增加，并用模运算实现周期性
+        const phaseOffset = i * (Math.PI / 2); // 产生多个环
+        // 反解出当前时间下，满足波峰的 R
+        let r = ((State.omega * State.time - phaseOffset) / State.k) % maxR;
+        if (r < 0) r += maxR;
+        if (r < 1) continue; // 忽略太靠近中心的
+
+        // 判断该处磁场强度作为透明度 (近似 H_φ ∝ sin(ωt-kR)/R )
+        const hIntensity = Math.abs(Math.sin(State.omega * State.time - State.k * r)) / (1 + r*0.1);
+        ctx.globalAlpha = Math.min(1, hIntensity * 2);
+
+        ctx.beginPath();
+        // 用多边形逼近 3D 圆
+        const segments = 32;
+        for (let j = 0; j <= segments; j++) {
+            const angle = (j / segments) * Math.PI * 2;
+            const px = r * Math.cos(angle);
+            const py = r * Math.sin(angle);
+            const p = project3D(px, py, 0); // 暂画在 z=0 平面
+            if (j === 0) ctx.moveTo(p.u, p.v);
+            else ctx.lineTo(p.u, p.v);
+        }
+        ctx.stroke();
+    }
+    ctx.globalAlpha = 1.0;
+}
+
+/**
+ * 绘制辐射电场 E (波纹随时间起伏的振动 = E = -∂A/∂t )
+ * 表现为闭合的电场环，在此截取 X-Z 平面 (y=0) 的环形进行示意
+ */
+function drawElectricE() {
+    ctx.lineWidth = State.lineWidth;
+    setGlow(CONFIG.colors.eField, State.bloom);
+    
+    const maxR = CONFIG.gridSize;
+    // 在 x-z 平面上画出辐射出去的闭合环 (Kidney bean shape 简化)
+    for (let i = 0; i < 3; i++) {
+        let r_center = ((State.omega * State.time - i*Math.PI) / State.k) % (maxR*1.5);
+        if (r_center < 0) r_center += (maxR*1.5);
+        if (r_center < 2) continue;
+
+        ctx.globalAlpha = Math.max(0, 1 - r_center/(maxR*1.5));
+        
+        // 左侧环 (x < 0)
+        drawELoop(-r_center, r_center);
+        // 右侧环 (x > 0)
+        drawELoop(r_center, r_center);
+    }
+    ctx.globalAlpha = 1.0;
+}
+
+// 辅助函数：绘制单个 E 场闭合环 (形似半月)
+function drawELoop(x_center, radius) {
+    ctx.beginPath();
+    const segments = 20;
+    // 极坐标参数方程生成闭合环
+    for (let j = 0; j <= segments; j++) {
+        const theta = (j / segments) * Math.PI * 2;
+        // 构造一个水滴形/肾形环，高度依赖于 z (dipole 辐射方向图特性 sinθ)
+        const rad = radius * 0.4 * Math.abs(Math.sin(theta)); 
+        const px = x_center + rad * Math.cos(theta);
+        const pz = rad * Math.sin(theta) * 1.5; // Z轴拉长一点
+        const p = project3D(px, 0, pz); // 画在 y=0 平面
+        if (j === 0) ctx.moveTo(p.u, p.v);
+        else ctx.lineTo(p.u, p.v);
+    }
+    ctx.stroke();
+}
+
+/**
+ * 绘制新物理场：标量电位 Φ
+ * 公式：Φ(r,t) ∝ cosθ * [ cos(ωt-kR)/R² - k*sin(ωt-kR)/R ]
+ * 为呈现3D极性空间分布，我们对其在 y=0 纵切面做高精度粒子场解算
+ */
+function drawScalarPhi() {
+    const limit = CONFIG.gridSize;
+    const step = CONFIG.gridStep;
+    
+    const posParticles = [];
+    const negParticles = [];
+
+    // 严谨纵向解算 (x - z 剖面面源)
+    for (let x = -limit; x <= limit; x += step) {
+        for (let z = -limit; z <= limit; z += step) {
+            if (x === 0 && z === 0) continue;
+
+            const R = Math.sqrt(x*x + z*z);
+            const cosTheta = z / R; // cos(θ) = z / R (在z=0赤道面电位为0)
+            
+            const phase = State.omega * State.time - State.k * R;
+            
+            // 准静态项 (1/R^2) 与 波动辐射项 (-k/R) 物理叠加
+            const nearField = cosTheta / (R * R + 0.8);
+            const farField = -State.k * cosTheta * Math.sin(phase) / (R + 0.5);
+            
+            // 整合得到随时间推迟变换的电势场强度
+            const Phi = (State.amp * 2.2) * (nearField * Math.cos(phase) + farField);
+            
+            // 空间三维投影
+            const p = project3D(x, 0, z); // 位于 y = 0 的垂直平面上
+            
+            // 物理电势强度决定粒子大小
+            const radius = Math.min(10, Math.abs(Phi) * 0.4);
+            if (radius < 0.2) continue;
+
+            if (Phi > 0) {
+                posParticles.push({ u: p.u, v: p.v, r: radius });
+            } else {
+                negParticles.push({ u: p.u, v: p.v, r: radius });
+            }
+        }
+    }
+
+    // 渲染正电位粒子场（橙色 +）
+    setGlow(CONFIG.colors.aPos, State.bloom);
+    posParticles.forEach(pt => {
+        ctx.beginPath();
+        ctx.arc(pt.u, pt.v, pt.r, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // 渲染负电位粒子场（蓝色 -）
+    setGlow(CONFIG.colors.aNeg, State.bloom);
+    negParticles.forEach(pt => {
+        ctx.beginPath();
+        ctx.arc(pt.u, pt.v, pt.r, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+// ================= 示波器逻辑 =================
+const historyLength = 100;
+const historyI = new Array(historyLength).fill(0);
+const historyEffect = new Array(historyLength).fill(0);
+let scopePtr = 0;
+
+function updateScope(currentI, currentEffect) {
+    historyI[scopePtr] = currentI;
+    historyEffect[scopePtr] = currentEffect;
+    scopePtr = (scopePtr + 1) % historyLength;
+
+    const w = scopeCanvas.width;
+    const h = scopeCanvas.height;
+    scopeCtx.clearRect(0, 0, w, h);
+    
+    // 绘制中心基准线
+    scopeCtx.strokeStyle = '#333';
+    scopeCtx.lineWidth = 1;
+    scopeCtx.beginPath(); scopeCtx.moveTo(0, h/2); scopeCtx.lineTo(w, h/2); scopeCtx.stroke();
+
+    // 绘制波形通用函数
+    const drawWave = (dataArray, color, scale) => {
+        scopeCtx.beginPath();
+        scopeCtx.strokeStyle = color;
+        scopeCtx.lineWidth = 2;
+        for (let i = 0; i < historyLength; i++) {
+            const idx = (scopePtr + i) % historyLength;
+            const x = (i / historyLength) * w;
+            const y = h/2 - (dataArray[idx] * scale * (h/2));
+            if (i === 0) scopeCtx.moveTo(x, y);
+            else scopeCtx.lineTo(x, y);
+        }
+        scopeCtx.stroke();
+    };
+
+    // I(t) 归一化振幅为 1
+    drawWave(historyI, CONFIG.colors.aPos, 0.8);
+    // 空间推迟效应波形
+    drawWave(historyEffect, CONFIG.colors.hField, 0.8);
+}
+
+
+// ================= 主渲染循环 =================
+function animate() {
+    // 性能优化：清除画布，填充底色
+    ctx.fillStyle = '#05050a';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // 物理量计算
+    const phaseI = State.omega * State.time;
+    const currentI = Math.cos(phaseI); // I(t) = I0 * cos(ωt)
+    
+    // 示波器采样（设远端测试点距离 R = 10）
+    const testR = 10;
+    let testEffect = 0;
+    
+    if (State.scene === 5 || State.scene === 6) {
+        // 在标量电位或统一图景中，重点监测极轴方向 z=4 处电位波形
+        const testCosTheta = 4 / Math.sqrt(testR * testR + 16);
+        const near = testCosTheta / (testR * testR + 0.8);
+        const far = -State.k * testCosTheta * Math.sin(phaseI - State.k * testR) / (testR + 0.5);
+        testEffect = (near * Math.cos(phaseI - State.k * testR) + far) * 4;
+    } else {
+        // 在其它磁位/电磁场场景，监测推迟势 A_z ∝ cos(ωt - kR)
+        testEffect = Math.cos(phaseI - State.k * testR); 
+    }
+
+    // 渲染管线
+    if (State.layers.grid) drawGrid();
+    
+    if (State.scene === 1 || State.scene === 4 || State.scene === 6) drawVectorA();
+    if (State.scene === 2 || State.scene === 4) { if(State.scene===2) drawVectorA(); drawMagneticH(); }
+    if (State.scene === 3 || State.scene === 4) { if(State.scene===3) drawVectorA(); drawElectricE(); }
+    if (State.scene === 5 || State.scene === 6) drawScalarPhi();
+    
+    drawDipole(currentI);
+
+    // 遥测与示波器更新
+    if (State.layers.hud) {
+        document.getElementById('hud-telemetry').style.display = 'flex';
+        document.getElementById('hud-scope').style.display = 'flex';
+        document.getElementById('tel-phase').innerText = phaseI.toFixed(2) + ' rad';
+        document.getElementById('tel-current').innerText = (currentI * State.amp/10).toFixed(2) + ' A';
+        updateScope(currentI, testEffect);
+    } else {
+        document.getElementById('hud-telemetry').style.display = 'none';
+        document.getElementById('hud-scope').style.display = 'none';
+    }
+
+    State.time += 1;
+    requestAnimationFrame(animate);
+}
+
+// ================= UI 交互绑定 =================
+
+// 场景切换
+function setScene(id) {
+    State.scene = id;
+    document.querySelectorAll('.btn-group .btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.btn-group .btn[data-scene="${id}"]`).classList.add('active');
+    updateFormulaText();
+}
+
+// 公式文案更新
+const formulaBox = document.getElementById('formula-display');
+const formulas = {
+    1: `矢量磁位 <span class="formula-hl">A(r,t)</span><br>方向：严格平行于源电流 (z轴)<br>公式：A_z = (μ₀I₀l / 4π<span class="formula-hl">R</span>) * cos(ωt - <span class="formula-hl">kR</span>)<br>现象：如水面扩散的波纹，距离R越远发生相位延迟(推迟势)`,
+    2: `磁场强 <span class="formula-hl">H = ∇ × A</span><br>空间几何：由于A只有z分量，其旋度表现为环绕z轴的水平涡旋线(青色)。<br>远区近似：H_φ ∝ jkA_z ∝ sin(ωt - kR)`,
+    3: `辐射电场 <span class="formula-hl">E = -∂A/∂t</span> (远区近似)<br>时间导数导致相位偏移 90°。<br>表现为在空间中交替产生的闭合电场环(品红)，脱离天线向外辐射。`,
+    5: `标量电位 <span class="formula-hl">Φ(r,t)</span> (Lorenz规范)<br>电极性分布：由于电荷在偶极子两端堆积，势场呈纵向对称极性(z轴)。<br>公式：Φ = (p₀ cosθ / 4πε₀) * [ cos(ωt-kR)/R² - k sin(ωt-kR)/R ]<br>表现：z > 0 空间为正(橙色)，z < 0 为负(蓝色)。近区 1/R² 场强项主导，远区 1/R 波项发生时间相位延迟。`,
+    6: `电磁势统一图景 <span class="formula-hl">A^μ = (Φ/c, A)</span><br>物理约束 (洛伦兹规范)：<span class="formula-hl">∇·A + (1/c²)∂Φ/∂t = 0</span><br>空间正交证明：矢量势 A 由纵向电流激发出赤道面(z=0)的横向波纹，标量势 Φ 由端点电荷堆积激发出极轴面(y=0)的纵向粒子场。二者共同构成推迟传播的四维势。`,
+    4: `电磁辐射完整物理图像<br>麦克斯韦方程组综合解：<br>源(偶极子) -> 产生势(A, Φ) -> 衍生场(E, H)<br>能量以 Poynting 矢量 (S = E × H) 形式向外传播。`
+};
+function updateFormulaText() { formulaBox.innerHTML = formulas[State.scene]; }
+updateFormulaText();
+
+// 绑定范围滑块
+function bindSlider(id, stateKey, valSuffix = '') {
+    const el = document.getElementById(`ctrl-${id}`);
+    const valEl = document.getElementById(`val-${id}`);
+    el.addEventListener('input', (e) => {
+        State[stateKey] = parseFloat(e.target.value);
+        valEl.innerText = parseFloat(e.target.value).toFixed(id==='amp'||id==='bloom'?0:2) + valSuffix;
+        if(id==='zoom') valEl.innerText = (State.zoom*100).toFixed(0)+'%';
+        updateHUDValues();
+    });
+}
+bindSlider('omega', 'omega');
+bindSlider('k', 'k');
+bindSlider('amp', 'amp');
+bindSlider('zoom', 'zoom');
+bindSlider('lw', 'lineWidth', ' ft');
+bindSlider('bloom', 'bloom', ' px');
+
+// 绑定复选框
+document.getElementById('layer-grid').addEventListener('change', e => State.layers.grid = e.target.checked);
+document.getElementById('layer-hud').addEventListener('change', e => State.layers.hud = e.target.checked);
+
+function updateHUDValues() {
+    document.getElementById('tel-k').innerText = State.k.toFixed(2) + ' m⁻¹';
+    document.getElementById('tel-pitch').innerText = State.camera.pitch.toFixed(2);
+    document.getElementById('tel-yaw').innerText = State.camera.yaw.toFixed(2);
+}
+
+// ================= 启动 =================
+requestAnimationFrame(animate);
+
+</script>
+</body>
+</html>

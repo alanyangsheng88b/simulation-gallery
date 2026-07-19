@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDA 电磁偶极天线辐射场仿真器</title>
+    <!-- Tailwind CSS for modern layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for professional typography -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'JetBrains+Mono', monospace;
+            background-color: #000000;
+        }
+        .orbitron-font {
+            font-family: 'Orbitron', sans-serif;
+        }
+        /* Custom scrollbar for dark EDA theme */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #020205;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #38bdf8;
+        }
+        /* Style for editable text */
+        [contenteditable="true"]:hover {
+            background-color: rgba(30, 41, 59, 0.5);
+            cursor: text;
+        }
+        [contenteditable="true"]:focus {
+            background-color: rgba(15, 23, 42, 0.8);
+            box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.5);
+        }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen flex flex-col overflow-x-hidden selection:bg-sky-500 selection:text-black">
+
+    <!-- Header Block -->
+    <header class="border-b border-slate-800 bg-[#020205] px-6 py-3 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full bg-sky-500 animate-pulse shadow-[0_0_10px_#0ea5e9]"></div>
+            <!-- Title & Subtitle: Added contenteditable -->
+            <h1 class="text-lg orbitron-font font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400 outline-none rounded px-1 transition-colors" contenteditable="true" spellcheck="false" title="点击编辑面板标题">
+                GEMINI RF-DIPOLE EM SIMULATOR 
+                <span class="text-xs text-sky-500/80 font-normal outline-none rounded px-1 transition-colors" contenteditable="true" spellcheck="false" title="点击编辑副标题">v5.2.0</span>
+            </h1>
+        </div>
+        <div class="flex items-center gap-6 text-xs text-slate-400">
+            <div>仿真核状态: <span class="text-emerald-400 font-bold" id="fpsDisplay">ONLINE</span></div>
+            <div>天线模式: <span class="text-sky-400 font-bold">对称振子 (Dipole)</span></div>
+            <div>物理引擎: <span class="text-indigo-400 font-bold">麦克斯韦赫兹场方程</span></div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 p-4 gap-4 max-w-[1600px] w-full mx-auto">
+        
+        <!-- Left Panel: Control & Parameters (3 cols) -->
+        <div class="lg:col-span-3 flex flex-col gap-4">
+            <!-- Parameters Box -->
+            <div class="bg-[#05050a] border border-slate-800/80 rounded-lg p-4 shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-4">
+                    <h2 class="text-sm font-bold tracking-widest text-sky-400 orbitron-font">SYS CONTROLS // 参数调整</h2>
+                    <span class="text-[10px] text-slate-500">UNIT: SI</span>
+                </div>
+                
+                <div class="space-y-5">
+                    <!-- Simulation Speed slider (NEW) -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">仿真时间流速 (Speed)</span>
+                            <span class="text-sky-400 font-bold" id="speedVal">1.0x</span>
+                        </div>
+                        <input type="range" id="speedSlider" min="0.0" max="5.0" step="0.1" value="1.0" class="w-full accent-sky-500 bg-slate-900 h-1 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- Frequency slider -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">激励源频率 (f)</span>
+                            <span class="text-sky-400 font-bold" id="freqVal">2.40 GHz</span>
+                        </div>
+                        <input type="range" id="freqSlider" min="0.8" max="4.0" step="0.1" value="2.4" class="w-full accent-sky-500 bg-slate-900 h-1 rounded-lg appearance-none cursor-pointer">
+                        <p class="text-[10px] text-slate-500 mt-1">控制电磁波周期的物理波速关系，决定空间波长大小</p>
+                    </div>
+
+                    <!-- Amplitude / Power slider -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">发射电压功率 (V₀)</span>
+                            <span class="text-sky-400 font-bold" id="ampVal">1.50 kV</span>
+                        </div>
+                        <input type="range" id="ampSlider" min="0.5" max="3.0" step="0.1" value="1.5" class="w-full accent-sky-500 bg-slate-900 h-1 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- Antenna Length slider -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">天线物理长度 (2L)</span>
+                            <span class="text-sky-400 font-bold" id="lenVal">12.0 cm</span>
+                        </div>
+                        <input type="range" id="lenSlider" min="4.0" max="24.0" step="0.5" value="12.0" class="w-full accent-sky-500 bg-slate-900 h-1 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- Field Map Gain -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">显示场强增益 (Gain)</span>
+                            <span class="text-sky-400 font-bold" id="gainVal">1.2x</span>
+                        </div>
+                        <input type="range" id="gainSlider" min="0.2" max="3.0" step="0.1" value="1.2" class="w-full accent-sky-500 bg-slate-900 h-1 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visual Style Controls -->
+            <div class="bg-[#05050a] border border-slate-800/80 rounded-lg p-4 shadow-xl flex-1 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                        <h2 class="text-sm font-bold tracking-widest text-indigo-400 orbitron-font">VISUAL MODES // 显示模式</h2>
+                    </div>
+
+                    <div class="space-y-3">
+                        <!-- Mode Selector -->
+                        <div>
+                            <label class="text-[11px] text-slate-400 block mb-1">渲染图层</label>
+                            <select id="renderMode" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-xs text-sky-400 focus:outline-none focus:border-sky-500">
+                                <option value="density">电场分布 (E_theta 伪彩图)</option>
+                                <option value="vectors">矢量场箭头 (E-Field Vectors)</option>
+                                <option value="contour">波前等相位线 (Wavefronts)</option>
+                                <option value="hybrid" selected>混合渲染 (极度推荐)</option>
+                            </select>
+                        </div>
+
+                        <!-- Physics overlay toggles -->
+                        <div class="space-y-2 pt-2">
+                            <label class="flex items-center gap-2 text-xs cursor-pointer text-slate-300 hover:text-white">
+                                <input type="checkbox" id="showGrid" checked class="rounded border-slate-800 text-sky-500 bg-slate-950 focus:ring-0">
+                                <span>显示 EDA 背景测量网格</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-xs cursor-pointer text-slate-300 hover:text-white">
+                                <input type="checkbox" id="showAntennaField" checked class="rounded border-slate-800 text-sky-500 bg-slate-950 focus:ring-0">
+                                <span>高亮偶极天线电荷流动</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-xs cursor-pointer text-slate-300 hover:text-white">
+                                <input type="checkbox" id="showEFieldLines" checked class="rounded border-slate-800 text-sky-500 bg-slate-950 focus:ring-0">
+                                <span>实时渲染闭合电力线环</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulation Status Metrics -->
+                <div class="border-t border-slate-900 pt-3 mt-4 text-[11px] space-y-1.5 text-slate-400">
+                    <div class="flex justify-between"><span>波速 (c):</span> <span class="text-slate-200">2.998×10⁸ m/s (仿真等效)</span></div>
+                    <div class="flex justify-between"><span>等效波长 (λ):</span> <span class="text-emerald-400" id="waveLengthMeta">12.50 cm</span></div>
+                    <div class="flex justify-between"><span>半波谐振长度 (λ/2):</span> <span class="text-amber-400" id="halfWaveMeta">6.25 cm</span></div>
+                    <div class="flex justify-between"><span>阻抗匹配系数 (SWR):</span> <span class="text-sky-400">1.05 (完美匹配)</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center: 4:3 Simulation Canvas Block (6 cols) -->
+        <div class="lg:col-span-6 flex flex-col items-center justify-center bg-[#010102] border border-slate-800/80 rounded-lg p-2 shadow-2xl relative">
+            <!-- 4:3 Container with absolute ratios -->
+            <div class="w-full relative" style="aspect-ratio: 4/3;">
+                <canvas id="simCanvas" class="absolute inset-0 w-full h-full rounded cursor-crosshair"></canvas>
+            </div>
+            <!-- Bottom HUD -->
+            <div class="w-full flex justify-between items-center text-[10px] text-slate-500 px-2 pt-2">
+                <span>[X-Y PLANE PROJECTION]</span>
+                <span class="text-sky-500/80 hover:underline cursor-pointer" id="resetProbeBtn">双击画布或点击此处重置探针</span>
+                <span>STATUS: RADIATING</span>
+            </div>
+        </div>
+
+        <!-- Right Panel: Oscilloscope & Telemetry (3 cols) -->
+        <div class="lg:col-span-3 flex flex-col gap-4">
+            <!-- Oscilloscope Widget -->
+            <div class="bg-[#05050a] border border-slate-800/80 rounded-lg p-4 shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                    <h2 class="text-sm font-bold tracking-widest text-emerald-400 orbitron-font">OSCILLOSCOPE // 探针示波器</h2>
+                    <span class="text-[9px] bg-emerald-950 text-emerald-400 px-1 border border-emerald-800 rounded">CH1+CH2</span>
+                </div>
+                
+                <!-- Scope Screen -->
+                <div class="bg-black border border-slate-900 rounded p-1 mb-2 relative">
+                    <canvas id="scopeCanvas" width="280" height="150" class="w-full h-[150px]"></canvas>
+                    <div class="absolute top-2 right-2 flex flex-col text-[8px] gap-0.5 pointer-events-none bg-black/60 p-1 rounded">
+                        <div class="flex items-center gap-1"><span class="w-2 h-0.5 bg-sky-400 inline-block"></span><span class="text-sky-400">电场 E_θ</span></div>
+                        <div class="flex items-center gap-1"><span class="w-2 h-0.5 bg-rose-400 inline-block"></span><span class="text-rose-400">磁场 H_φ</span></div>
+                    </div>
+                </div>
+
+                <!-- Scope Controls and Telemetry -->
+                <div class="text-[11px] grid grid-cols-2 gap-2 text-slate-400">
+                    <div class="bg-slate-950 p-2 rounded border border-slate-900/60">
+                        <div class="text-[9px] text-slate-500">探针位置 (R, θ)</div>
+                        <div class="font-bold text-slate-200" id="probePosMeta">R: 12.0cm, 90°</div>
+                    </div>
+                    <div class="bg-slate-950 p-2 rounded border border-slate-900/60">
+                        <div class="text-[9px] text-slate-500">两相相位差 (ΔΦ)</div>
+                        <div class="font-bold text-amber-400" id="phaseDiffMeta">90.0° (近场)</div>
+                    </div>
+                    <div class="bg-slate-950 p-2 rounded border border-slate-900/60">
+                        <div class="text-[9px] text-slate-500">电场瞬态 (E_θ)</div>
+                        <div class="font-bold text-sky-400" id="eMaxMeta">0.00 V/m</div>
+                    </div>
+                    <div class="bg-slate-950 p-2 rounded border border-slate-900/60">
+                        <div class="text-[9px] text-slate-500">磁场瞬态 (H_φ)</div>
+                        <div class="font-bold text-rose-400" id="hMaxMeta">0.00 A/m</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Antenna Polar Radiation Pattern -->
+            <div class="bg-[#05050a] border border-slate-800/80 rounded-lg p-4 shadow-xl flex-1 flex flex-col">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                    <h2 class="text-sm font-bold tracking-widest text-amber-400 orbitron-font">RADIATION PATTERN // 方向图</h2>
+                    <span class="text-[9px] text-slate-500">XZ-PLANE</span>
+                </div>
+                
+                <div class="flex-1 flex items-center justify-center min-h-[140px]">
+                    <canvas id="polarCanvas" width="200" height="200" class="max-h-[180px] max-w-[180px]"></canvas>
+                </div>
+
+                <div class="text-[10px] text-slate-500 text-center mt-2">
+                    双极辐射形变: <span id="gainText">2.15</span> dBi (最大增益)
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Instructions / Pop Science Explainer -->
+    <footer class="border-t border-slate-900 bg-[#020205] p-4 text-xs text-slate-500">
+        <div class="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <span class="text-slate-300 font-bold block mb-1">科普知识：电磁波的诞生与剥离</span>
+                <p class="leading-relaxed">
+                    在对称偶极子天线馈电中心，高频交流电流激励起交变电磁场。在靠近天线的近场（Near-field）区，E 和 H 具有 90° 相位差，能量在天线与周围空间来回吞吐，并不向外辐射。
+                </p>
+            </div>
+            <div>
+                <span class="text-slate-300 font-bold block mb-1">为什么会“掐断”形成波包？</span>
+                <p class="leading-relaxed">
+                    随着距离 r 增加，静电场和感生场快速衰减，而辐射场占主导。电场线在天线极性反转时无法及时收回，从而发生相互吸引并重组连接，形成独立的**闭合电力线环**，脱离天线以光速向外辐射。
+                </p>
+            </div>
+            <div>
+                <span class="text-slate-300 font-bold block mb-1">EDA 软件操作指南</span>
+                <p class="leading-relaxed">
+                    1. <b>拖拽黄色探针</b>：在模拟平面中任意移动探针，右侧示波器将实时更新采样值。<br>
+                    2. <b>调整参数</b>：改变速度调节时间流逝；改变频率和天线长度观察辐射强度及方向图的物理形变。
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Core Simulation Engine Script -->
+    <script>
+        // --- 物理状态参数定义 ---
+        const params = {
+            speed: 1.0,          // 仿真时间流速系数
+            frequency: 2.4,      // 频率 (MHz / GHz 抽象表达)
+            amplitude: 1.5,      // 馈电振幅
+            antennaLength: 60,   // 半天线长度 L (像素)
+            gain: 1.2,           // 渲染放大率
+            wavelength: 120,     // 空间波长 (像素)
+            c: 320,              // 空间波速 (像素/s)
+        };
+
+        // UI 绑定
+        const speedSlider = document.getElementById('speedSlider');
+        const speedVal = document.getElementById('speedVal');
+        const freqSlider = document.getElementById('freqSlider');
+        const freqVal = document.getElementById('freqVal');
+        const ampSlider = document.getElementById('ampSlider');
+        const ampVal = document.getElementById('ampVal');
+        const lenSlider = document.getElementById('lenSlider');
+        const lenVal = document.getElementById('lenVal');
+        const gainSlider = document.getElementById('gainSlider');
+        const gainVal = document.getElementById('gainVal');
+        const renderMode = document.getElementById('renderMode');
+        
+        const showGrid = document.getElementById('showGrid');
+        const showAntennaField = document.getElementById('showAntennaField');
+        const showEFieldLines = document.getElementById('showEFieldLines');
+        
+        const waveLengthMeta = document.getElementById('waveLengthMeta');
+        const halfWaveMeta = document.getElementById('halfWaveMeta');
+
+        // 主 Canvas 设置
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 离屏 Canvas (用于计算物理波场伪彩密度图)
+        const offscreenCanvas = document.createElement('canvas');
+        const offscreenCtx = offscreenCanvas.getContext('2d');
+        const scaleFactor = 4; // 密度图分辨率缩放 1/4
+
+        // 探针示波器
+        const scopeCanvas = document.getElementById('scopeCanvas');
+        const scopeCtx = scopeCanvas.getContext('2d');
+        // 极坐标方向图
+        const polarCanvas = document.getElementById('polarCanvas');
+        const polarCtx = polarCanvas.getContext('2d');
+
+        // 探针状态
+        const probe = {
+            x: 0,
+            y: 0,
+            r: 100,
+            theta: Math.PI / 2,
+            isDragging: false,
+            size: 8
+        };
+
+        // 历史采样值（示波器用）
+        const probeHistory = [];
+        const maxHistoryLength = 280; // 对应示波器宽度
+
+        // 全局时间管理
+        let tick = 0;
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let lastFpsTime = performance.now();
+
+        // 初始化
+        function initCanvasSize() {
+            canvas.width = 800;
+            canvas.height = 600;
+
+            offscreenCanvas.width = Math.ceil(canvas.width / scaleFactor);
+            offscreenCanvas.height = Math.ceil(canvas.height / scaleFactor);
+
+            if (probe.x === 0 && probe.y === 0) {
+                probe.x = canvas.width / 2 + 120;
+                probe.y = canvas.height / 2 - 80;
+                updateProbePolar();
+            }
+        }
+
+        function updateProbePolar() {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const dx = probe.x - cx;
+            const dy = cy - probe.y; // Y轴物理反向
+            probe.r = Math.sqrt(dx * dx + dy * dy);
+            // 夹角 theta 从天线轴 (Y轴) 算起
+            probe.theta = Math.atan2(Math.abs(dx), dy);
+            
+            document.getElementById('probePosMeta').textContent = 
+                `R: ${(probe.r/10).toFixed(1)}cm, ${(probe.theta * 180 / Math.PI).toFixed(0)}°`;
+        }
+
+        // --- 交互事件处理 ---
+        function getMousePos(canvas, evt) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (evt.clientX - rect.left) * scaleX,
+                y: (evt.clientY - rect.top) * scaleY
+            };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getMousePos(canvas, e);
+            const dist = Math.hypot(pos.x - probe.x, pos.y - probe.y);
+            if (dist < probe.size * 3) {
+                probe.isDragging = true;
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const pos = getMousePos(canvas, e);
+            const dist = Math.hypot(pos.x - probe.x, pos.y - probe.y);
+            canvas.style.cursor = dist < probe.size * 3 || probe.isDragging ? 'grab' : 'crosshair';
+            
+            if (probe.isDragging) {
+                canvas.style.cursor = 'grabbing';
+                probe.x = pos.x;
+                probe.y = pos.y;
+                updateProbePolar();
+            }
+        });
+
+        window.addEventListener('mouseup', () => { probe.isDragging = false; canvas.style.cursor = 'crosshair'; });
+        canvas.addEventListener('dblclick', () => {
+            probe.x = canvas.width / 2 + 140;
+            probe.y = canvas.height / 2;
+            updateProbePolar();
+        });
+        document.getElementById('resetProbeBtn').addEventListener('click', () => {
+            probe.x = canvas.width / 2 + 140;
+            probe.y = canvas.height / 2;
+            updateProbePolar();
+        });
+
+        // --- 物理计算方程 ---
+        function getDipoleFields(r, theta, t) {
+            const f = params.frequency;
+            const lambda = params.wavelength;
+            const k = (2 * Math.PI) / lambda;
+            const omega = 2 * Math.PI * f;
+            const phase = k * r - omega * t;
+            
+            const sinP = Math.sin(phase);
+            const cosP = Math.cos(phase);
+            
+            const kr = Math.max(k * r, 0.01); // 防零除
+            const kr2 = kr * kr;
+            const kr3 = kr2 * kr;
+            
+            // Er
+            const Er = 2 * Math.cos(theta) * (sinP / kr2 + cosP / kr3) * params.amplitude;
+            // Etheta
+            const Etheta = Math.sin(theta) * (cosP / kr + sinP / kr2 + cosP / kr3) * params.amplitude;
+            // Hphi
+            const Hphi = Math.sin(theta) * (cosP / kr + sinP / kr2) * params.amplitude * 1.2;
+
+            return { Er, Etheta, Hphi };
+        }
+
+        // --- UI 参数联动更新 ---
+        function updatePhysicsParams() {
+            params.speed = parseFloat(speedSlider.value);
+            speedVal.textContent = params.speed.toFixed(1) + "x";
+
+            params.frequency = parseFloat(freqSlider.value);
+            freqVal.textContent = params.frequency.toFixed(2) + " GHz";
+
+            params.amplitude = parseFloat(ampSlider.value);
+            ampVal.textContent = params.amplitude.toFixed(2) + " kV";
+
+            params.antennaLength = parseFloat(lenSlider.value) * 5; 
+            lenVal.textContent = parseFloat(lenSlider.value).toFixed(1) + " cm";
+
+            params.gain = parseFloat(gainSlider.value);
+            gainVal.textContent = params.gain.toFixed(1) + "x";
+
+            params.wavelength = params.c / params.frequency;
+
+            const physWavelength = (30 / params.frequency).toFixed(2);
+            waveLengthMeta.textContent = physWavelength + " cm";
+            halfWaveMeta.textContent = (physWavelength / 2).toFixed(2) + " cm";
+            
+            drawPolarPattern(); // 参数改变时更新极坐标图
+        }
+
+        [speedSlider, freqSlider, ampSlider, lenSlider, gainSlider].forEach(slider => {
+            slider.addEventListener('input', updatePhysicsParams);
+        });
+
+        // --- 渲染模块 ---
+        function drawEDAGrid(ctx, w, h) {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, w, h);
+
+            if (!showGrid.checked) return;
+
+            ctx.strokeStyle = 'rgba(20, 30, 45, 0.5)';
+            ctx.lineWidth = 0.5;
+
+            const gridSize = 40;
+            ctx.beginPath();
+            for (let x = 0; x < w; x += gridSize) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, h);
+            }
+            for (let y = 0; y < h; y += gridSize) {
+                ctx.moveTo(0, y); ctx.lineTo(w, y);
+            }
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h);
+            ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+            ctx.stroke();
+        }
+
+        function computeFieldDensity(t) {
+            const w = offscreenCanvas.width;
+            const h = offscreenCanvas.height;
+            const imgData = offscreenCtx.createImageData(w, h);
+            const data = imgData.data;
+
+            const cx = w / 2;
+            const cy = h / 2;
+
+            for (let py = 0; py < h; py++) {
+                for (let px = 0; px < w; px++) {
+                    const dx = (px - cx) * scaleFactor;
+                    const dy = (cy - py) * scaleFactor; 
+                    const r = Math.sqrt(dx * dx + dy * dy);
+
+                    if (r < 15) continue; 
+
+                    const theta = Math.atan2(Math.abs(dx), dy);
+                    const { Etheta } = getDipoleFields(r, theta, t);
+
+                    const intensity = Etheta * params.gain * 50; 
+                    const idx = (py * w + px) * 4;
+
+                    if (intensity > 0) {
+                        data[idx] = 0;                                         
+                        data[idx + 1] = Math.min(255, intensity * 150);        
+                        data[idx + 2] = 255;                                   
+                        data[idx + 3] = Math.min(200, intensity * 230);        
+                    } else {
+                        data[idx] = Math.min(255, -intensity * 150);           
+                        data[idx + 1] = 0;                                     
+                        data[idx + 2] = 255;                                   
+                        data[idx + 3] = Math.min(200, -intensity * 230);       
+                    }
+                }
+            }
+            offscreenCtx.putImageData(imgData, 0, 0);
+        }
+
+        function drawFieldVectors(ctx, t) {
+            const step = 28;
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            ctx.lineWidth = 1.2;
+
+            for (let x = step / 2; x < canvas.width; x += step) {
+                for (let y = step / 2; y < canvas.height; y += step) {
+                    const dx = x - cx;
+                    const dy = cy - y; 
+                    const r = Math.sqrt(dx*dx + dy*dy);
+                    if (r < 30 || r > 380) continue;
+
+                    const theta = Math.atan2(dx, dy);
+                    const { Er, Etheta } = getDipoleFields(r, theta, t);
+
+                    const sinT = Math.sin(theta);
+                    const cosT = Math.cos(theta);
+                    const Ex = Er * sinT + Etheta * cosT;
+                    const Ey = Er * cosT - Etheta * sinT;
+
+                    const Emag = Math.sqrt(Ex*Ex + Ey*Ey);
+                    if (Emag < 0.005) continue;
+
+                    const len = Math.min(18, Emag * params.gain * 18);
+                    if (len < 1.5) continue;
+
+                    const vx = (Ex / Emag) * len;
+                    const vy = -(Ey / Emag) * len; 
+
+                    const brightness = Math.min(1, Emag * params.gain * 2);
+                    ctx.strokeStyle = `rgba(0, 240, 255, ${0.15 + brightness * 0.7})`;
+                    ctx.fillStyle = `rgba(0, 240, 255, ${0.15 + brightness * 0.7})`;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x - vx/2, y - vy/2);
+                    ctx.lineTo(x + vx/2, y + vy/2);
+                    ctx.stroke();
+
+                    const angle = Math.atan2(vy, vx);
+                    ctx.beginPath();
+                    ctx.arc(x + vx/2, y + vy/2, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        function drawWavefrontContours(ctx, t) {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const lambda = params.wavelength;
+            const phaseOffset = 2 * Math.PI * params.frequency * t;
+            ctx.lineWidth = 1.5;
+
+            const numWaves = 6;
+            for (let n = 0; n < numWaves; n++) {
+                const baseR = (n * lambda) + ((phaseOffset * (lambda / (2*Math.PI))) % lambda);
+                if (baseR > 400 || baseR < 20) continue;
+
+                ctx.strokeStyle = `rgba(0, 240, 255, ${Math.max(0, 1 - baseR / 380) * 0.6})`;
+                ctx.beginPath();
+
+                for (let angle = 0; angle <= Math.PI * 2 + 0.05; angle += 0.05) {
+                    const sinTheta = Math.sin(angle);
+                    const shapeFactor = sinTheta * sinTheta;
+                    const dynamicR = baseR * (0.3 + 0.7 * shapeFactor);
+                    if (dynamicR < 15) continue;
+
+                    const sx = cx + Math.sin(angle) * dynamicR;
+                    const sy = cy - Math.cos(angle) * dynamicR;
+                    if (angle === 0) ctx.moveTo(sx, sy);
+                    else ctx.lineTo(sx, sy);
+                }
+                ctx.stroke();
+            }
+        }
+
+        function drawHertzianFieldLines(ctx, t) {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const k = (2 * Math.PI) / params.wavelength;
+            const phase = 2 * Math.PI * params.frequency * t;
+            ctx.lineWidth = 1.0;
+            
+            const targetConstants = [-1.5, -1.0, -0.6, -0.3, -0.1, 0.1, 0.3, 0.6, 1.0, 1.5];
+            const numR = 120, numT = 72, maxR = 380;
+            const rStep = maxR / numR, tStep = (Math.PI * 2) / numT;
+
+            const grid = [];
+            for (let ri = 0; ri <= numR; ri++) {
+                grid[ri] = [];
+                const r = ri * rStep;
+                for (let ti = 0; ti <= numT; ti++) {
+                    const theta = ti * tStep;
+                    const kr = k * r;
+                    const psi = Math.sin(theta) * Math.sin(theta) * (Math.cos(kr - phase) + kr * Math.sin(kr - phase)) * params.amplitude;
+                    grid[ri][ti] = psi;
+                }
+            }
+
+            targetConstants.forEach(C => {
+                ctx.strokeStyle = C > 0 ? 'rgba(56, 189, 248, 0.4)' : 'rgba(168, 85, 247, 0.4)';
+                ctx.beginPath();
+                let isDrawing = false;
+                for (let ti = 0; ti <= numT; ti++) {
+                    const theta = ti * tStep;
+                    for (let ri = 1; ri < numR; ri++) {
+                        const psi1 = grid[ri-1][ti];
+                        const psi2 = grid[ri][ti];
+                        if ((psi1 - C) * (psi2 - C) <= 0) {
+                            const fraction = (C - psi1) / (psi2 - psi1);
+                            const r = (ri - 1 + fraction) * rStep;
+                            if (r < 18) continue;
+                            const sx = cx + Math.sin(theta) * r;
+                            const sy = cy - Math.cos(theta) * r; 
+                            if (!isDrawing) { ctx.moveTo(sx, sy); isDrawing = true; } 
+                            else { ctx.lineTo(sx, sy); }
+                            break; 
+                        }
+                    }
+                }
+                ctx.stroke();
+            });
+        }
+
+        function drawCenterSourceDevice(ctx, cx, cy, t) {
+            const w = 76;
+            const h = 54;
+
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+            ctx.shadowBlur = 18;
+            ctx.shadowOffsetY = 10;
+            ctx.shadowOffsetX = 5;
+
+            const metalGrad = ctx.createLinearGradient(cx - w/2, cy - h/2, cx - w/2, cy + h/2);
+            metalGrad.addColorStop(0.0, '#707785'); 
+            metalGrad.addColorStop(0.15, '#525a66'); 
+            metalGrad.addColorStop(0.5, '#2e333d');  
+            metalGrad.addColorStop(0.85, '#404754'); 
+            metalGrad.addColorStop(1.0, '#15171c');  
+
+            ctx.fillStyle = metalGrad;
+            ctx.beginPath();
+            ctx.roundRect(cx - w/2, cy - h/2, w, h, 8);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.strokeStyle = '#1e222b';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(cx - w/2, cy - h/2, w, h);
+            
+            ctx.strokeStyle = '#9da3ae';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(cx - w/2 + 2, cy - h/2 + 1);
+            ctx.lineTo(cx + w/2 - 2, cy - h/2 + 1);
+            ctx.stroke();
+
+            // 绘制圆形示波器屏幕 (复古)
+            const scrX = cx - 14;
+            const scrY = cy;
+            const scrR = 18;
+            
+            ctx.fillStyle = '#0a1a10';
+            ctx.beginPath();
+            ctx.arc(scrX, scrY, scrR, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(scrX - scrR, scrY); ctx.lineTo(scrX + scrR, scrY);
+            ctx.moveTo(scrX, scrY - scrR); ctx.lineTo(scrX, scrY + scrR);
+            ctx.stroke();
+
+            // 绘制一个模拟的小正弦波
+            ctx.strokeStyle = '#10b981';
+            ctx.beginPath();
+            for(let i=-scrR+2; i<scrR-2; i++) {
+                const y = Math.sin(i*0.4 - t*params.frequency*5) * 8;
+                if(i===-scrR+2) ctx.moveTo(scrX+i, scrY+y);
+                else ctx.lineTo(scrX+i, scrY+y);
+            }
+            ctx.stroke();
+
+            // 指示灯
+            const curPhase = Math.sin(2 * Math.PI * params.frequency * t);
+            const rColor = curPhase > 0 ? `rgba(239, 68, 68, ${curPhase})` : '#3f1616';
+            const bColor = curPhase < 0 ? `rgba(56, 189, 248, ${-curPhase})` : '#113a4f';
+            
+            ctx.fillStyle = rColor;
+            ctx.beginPath(); ctx.arc(cx + 20, cy - 12, 3, 0, Math.PI*2); ctx.fill();
+            
+            ctx.fillStyle = bColor;
+            ctx.beginPath(); ctx.arc(cx + 20, cy + 12, 3, 0, Math.PI*2); ctx.fill();
+        }
+
+        function drawAntenna(ctx, cx, cy, t) {
+            const L = params.antennaLength;
+            const w = 6;
+            
+            const omega = 2 * Math.PI * params.frequency;
+            // 电流分布 I(z) = I0 * sin(k(L - |z|)) * cos(wt)
+            const currentPhase = Math.cos(omega * t);
+
+            // 上臂
+            const topGrad = ctx.createLinearGradient(cx, cy - 20, cx, cy - L);
+            const intensityTop = currentPhase > 0 ? currentPhase : 0;
+            topGrad.addColorStop(0, `rgba(226, 232, 240, 1)`);
+            topGrad.addColorStop(1, `rgba(239, 68, 68, ${showAntennaField.checked ? 0.3 + intensityTop*0.7 : 0.8})`);
+            
+            ctx.fillStyle = topGrad;
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(cx - w/2, cy - L, w, L - 28, 3);
+            ctx.fill(); ctx.stroke();
+
+            // 下臂
+            const botGrad = ctx.createLinearGradient(cx, cy + 20, cx, cy + L);
+            const intensityBot = currentPhase < 0 ? -currentPhase : 0;
+            botGrad.addColorStop(0, `rgba(226, 232, 240, 1)`);
+            botGrad.addColorStop(1, `rgba(56, 189, 248, ${showAntennaField.checked ? 0.3 + intensityBot*0.7 : 0.8})`);
+            
+            ctx.fillStyle = botGrad;
+            ctx.beginPath();
+            ctx.roundRect(cx - w/2, cy + 28, w, L - 28, 3);
+            ctx.fill(); ctx.stroke();
+        }
+
+        function drawProbe(ctx) {
+            ctx.save();
+            // 光晕
+            ctx.beginPath();
+            ctx.arc(probe.x, probe.y, probe.size * 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(250, 204, 21, 0.2)';
+            ctx.fill();
+
+            // 实体探针
+            ctx.beginPath();
+            ctx.arc(probe.x, probe.y, probe.size, 0, Math.PI * 2);
+            ctx.fillStyle = '#facc15';
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 十字准星
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.8)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(probe.x - 12, probe.y); ctx.lineTo(probe.x + 12, probe.y);
+            ctx.moveTo(probe.x, probe.y - 12); ctx.lineTo(probe.x, probe.y + 12);
+            ctx.stroke();
+
+            // 虚线连接到原点
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.3)';
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, canvas.height / 2);
+            ctx.lineTo(probe.x, probe.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+
+        // --- 示波器渲染 ---
+        function updateAndDrawScope(t) {
+            // 获取当前探针处的场数据
+            const { Etheta, Hphi } = getDipoleFields(probe.r, probe.theta, t);
+            
+            probeHistory.push({ e: Etheta, h: Hphi });
+            if (probeHistory.length > maxHistoryLength) {
+                probeHistory.shift();
+            }
+
+            // 更新文本面板
+            document.getElementById('eMaxMeta').textContent = (Etheta * 10).toFixed(2) + " V/m";
+            document.getElementById('hMaxMeta').textContent = (Hphi * 10).toFixed(2) + " A/m";
+            
+            // 判断近远场计算相位差
+            const k = (2 * Math.PI) / params.wavelength;
+            const kr = k * probe.r;
+            let phaseDiff = 0;
+            if (kr > 2*Math.PI) phaseDiff = 0; // 远场同相
+            else phaseDiff = 90 * Math.max(0, 1 - kr/(2*Math.PI)); // 近场相差逐渐变大
+            document.getElementById('phaseDiffMeta').textContent = phaseDiff.toFixed(1) + "°";
+
+            // 绘制示波器
+            const w = scopeCanvas.width;
+            const h = scopeCanvas.height;
+            scopeCtx.fillStyle = '#020617';
+            scopeCtx.fillRect(0, 0, w, h);
+
+            // 栅格
+            scopeCtx.strokeStyle = '#1e293b';
+            scopeCtx.lineWidth = 1;
+            scopeCtx.beginPath();
+            for(let i=0; i<=w; i+=28) { scopeCtx.moveTo(i, 0); scopeCtx.lineTo(i, h); }
+            for(let i=0; i<=h; i+=15) { scopeCtx.moveTo(0, i); scopeCtx.lineTo(w, i); }
+            scopeCtx.stroke();
+            scopeCtx.strokeStyle = '#334155';
+            scopeCtx.beginPath();
+            scopeCtx.moveTo(0, h/2); scopeCtx.lineTo(w, h/2);
+            scopeCtx.stroke();
+
+            // 绘制波形
+            if (probeHistory.length === 0) return;
+            
+            const scaleY = 30; 
+            
+            // 绘制 H场 (Rose)
+            scopeCtx.strokeStyle = '#fb7185';
+            scopeCtx.lineWidth = 1.5;
+            scopeCtx.beginPath();
+            for(let i=0; i<probeHistory.length; i++) {
+                const x = (i / maxHistoryLength) * w;
+                const y = h/2 - probeHistory[i].h * scaleY;
+                if(i===0) scopeCtx.moveTo(x, y);
+                else scopeCtx.lineTo(x, y);
+            }
+            scopeCtx.stroke();
+
+            // 绘制 E场 (Sky)
+            scopeCtx.strokeStyle = '#38bdf8';
+            scopeCtx.lineWidth = 1.5;
+            scopeCtx.beginPath();
+            for(let i=0; i<probeHistory.length; i++) {
+                const x = (i / maxHistoryLength) * w;
+                const y = h/2 - probeHistory[i].e * scaleY;
+                if(i===0) scopeCtx.moveTo(x, y);
+                else scopeCtx.lineTo(x, y);
+            }
+            scopeCtx.stroke();
+        }
+
+        // --- 极坐标方向图 ---
+        function drawPolarPattern() {
+            const w = polarCanvas.width;
+            const h = polarCanvas.height;
+            const cx = w/2;
+            const cy = h/2;
+            const maxR = w/2 - 10;
+
+            polarCtx.fillStyle = '#05050a';
+            polarCtx.fillRect(0, 0, w, h);
+
+            // 极坐标背景网格
+            polarCtx.strokeStyle = '#1e293b';
+            polarCtx.lineWidth = 1;
+            for(let i=1; i<=4; i++) {
+                polarCtx.beginPath();
+                polarCtx.arc(cx, cy, maxR * (i/4), 0, Math.PI*2);
+                polarCtx.stroke();
+            }
+            polarCtx.beginPath();
+            polarCtx.moveTo(cx, 0); polarCtx.lineTo(cx, h);
+            polarCtx.moveTo(0, cy); polarCtx.lineTo(w, cy);
+            polarCtx.stroke();
+
+            // 绘制天线图示
+            polarCtx.strokeStyle = '#cbd5e1';
+            polarCtx.lineWidth = 3;
+            polarCtx.beginPath();
+            polarCtx.moveTo(cx, cy - 20); polarCtx.lineTo(cx, cy + 20);
+            polarCtx.stroke();
+
+            // 根据天线长度/波长比例计算方向图变化 (简化模型，默认理想振子为 sin^2(theta))
+            const ratio = (params.antennaLength * 2) / params.wavelength;
+            
+            polarCtx.strokeStyle = 'rgba(251, 191, 36, 0.8)';
+            polarCtx.fillStyle = 'rgba(251, 191, 36, 0.2)';
+            polarCtx.lineWidth = 2;
+            polarCtx.beginPath();
+
+            for(let angle=0; angle<=Math.PI*2 + 0.05; angle+=0.05) {
+                // 理想半波振子方向图函数 f(theta) 近似
+                let f = Math.sin(angle); 
+                
+                // 长天线分瓣效应演示
+                if (ratio > 0.8) {
+                    const kL = Math.PI * ratio;
+                    f = Math.abs( (Math.cos(kL * Math.cos(angle)) - Math.cos(kL)) / Math.sin(angle+0.001) );
+                    f = f / (1 - Math.cos(kL) + 0.001); // 归一化
+                }
+
+                const r = maxR * Math.abs(f);
+                const x = cx + Math.sin(angle) * r;
+                const y = cy - Math.cos(angle) * r;
+
+                if(angle===0) polarCtx.moveTo(x, y);
+                else polarCtx.lineTo(x, y);
+            }
+            polarCtx.closePath();
+            polarCtx.fill();
+            polarCtx.stroke();
+            
+            // 更新增益文本
+            let gain = 2.15;
+            if (ratio > 0.8) gain = 2.15 + (ratio-0.5)*2;
+            document.getElementById('gainText').textContent = gain.toFixed(2);
+        }
+
+        // --- 主循环 ---
+        function animate(currentTime) {
+            // 计算基于物理真实时间的 dt (秒)
+            const dt = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            // 帧率统计
+            frameCount++;
+            if (currentTime - lastFpsTime >= 1000) {
+                document.getElementById('fpsDisplay').textContent = `ONLINE (${frameCount} FPS)`;
+                frameCount = 0;
+                lastFpsTime = currentTime;
+            }
+
+            // 时间推进：由基础流速(dt) 结合速度系数(params.speed) 和 固定调节乘数 组成
+            tick += dt * params.speed * 1.5; 
+
+            // 清理主画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawEDAGrid(ctx, canvas.width, canvas.height);
+
+            const mode = renderMode.value;
+
+            // 渲染场图层
+            if (mode === 'density' || mode === 'hybrid') {
+                computeFieldDensity(tick);
+                // 使用双线性插值放大离屏画布
+                ctx.imageSmoothingEnabled = true;
+                ctx.drawImage(offscreenCanvas, 0, 0, canvas.width, canvas.height);
+            }
+            
+            if (mode === 'vectors') {
+                drawFieldVectors(ctx, tick);
+            }
+
+            if (mode === 'contour') {
+                drawWavefrontContours(ctx, tick);
+            }
+
+            if (mode === 'hybrid') {
+                if (showEFieldLines.checked) {
+                    drawHertzianFieldLines(ctx, tick);
+                }
+            } else if (showEFieldLines.checked && mode !== 'contour') {
+                drawHertzianFieldLines(ctx, tick);
+            }
+
+            // 渲染物理器件
+            drawCenterSourceDevice(ctx, canvas.width / 2, canvas.height / 2, tick);
+            drawAntenna(ctx, canvas.width / 2, canvas.height / 2, tick);
+
+            // 渲染交互探针
+            drawProbe(ctx);
+            
+            // 更新示波器
+            updateAndDrawScope(tick);
+
+            requestAnimationFrame(animate);
+        }
+
+        // 启动
+        window.onload = () => {
+            initCanvasSize();
+            updatePhysicsParams();
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>
