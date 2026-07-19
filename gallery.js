@@ -61,7 +61,7 @@ let loadTimeout = null;
 // ============================================================
 async function loadSimulations() {
   try {
-    const response = await fetch("data/simulations.json");
+    const response = await fetch("data/simulations.json?v=2");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     simulations = await response.json();
     renderCards();
