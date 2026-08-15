@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拍篮球物理仿真 · 电子仿真画廊</title>
+  <meta name="description" content="经典物理力学仿真：篮球自由落体与弹性碰撞，实时显示速度、加速度与能量转换">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="stylesheet" href="../../styles.css">
+  <link rel="stylesheet" href="../../assets/detail.css">
+</head>
+<body class="sim-detail-page">
+  <header class="detail-topbar">
+    <a class="back-link" href="../../index.html">← 返回画廊</a>
+    <div class="detail-heading">
+      <h1 class="detail-title">拍篮球物理仿真</h1>
+      <div class="detail-meta">
+        <span class="detail-badge" data-category="mechanics">🏀 力学</span>
+        <span class="difficulty-chip" title="难度">★☆☆ 入门</span>
+      </div>
+    </div>
+    <div class="detail-tags"><span class="card-tag">#物理</span><span class="card-tag">#力学</span><span class="card-tag">#弹性碰撞</span><span class="card-tag">#能量守恒</span></div>
+  </header>
+
+  <main class="detail-layout">
+    <!-- 左/上：仿真常驻舞台 -->
+    <section class="sim-stage" aria-label="仿真运行区">
+      <div class="sim-stage-inner">
+        <iframe
+          class="sim-frame"
+          src="../../sims/own/mechanics/拍篮球.html"
+          title="拍篮球物理仿真 仿真"
+          sandbox="allow-scripts allow-same-origin"
+          referrerpolicy="no-referrer"
+          allow="fullscreen"
+        ></iframe>
+      </div>
+    </section>
+
+    <!-- 右/下：滚动内容（原理 / 公式 / 引导实验 / 应用 / 视频 / 关联） -->
+    <aside class="sim-info" aria-label="仿真讲解">
+      <section class="info-section"><h2 class="info-h">概述</h2><p class="info-desc">经典物理力学仿真：篮球自由落体与弹性碰撞，实时显示速度、加速度与能量转换</p></section><section class="info-section"><h2 class="info-h">原理</h2><div class="prose">篮球自由下落时重力势能转化为动能，与地面碰撞时发生弹性/非弹性碰撞，部分能量以热和形变耗散。实时显示速度、加速度与机械能变化，直观呈现能量守恒与损耗。</div></section><section class="info-section"><h2 class="info-h">关键公式</h2><ul class="formula-list"><li><code class="formula">v = √(2gh)</code><span class="formula-label">自由落体末速度</span></li><li><code class="formula">E = mgh + ½mv²</code><span class="formula-label">机械能</span></li></ul></section><section class="info-section"><h2 class="info-h">引导实验</h2><p class="info-desc">观察弹跳中的能量转换</p><ol class="exp-list"><li class="exp-step"><span class="exp-num">1</span><div><strong>释放篮球</strong><p>点击释放，观察下落过程的速度变化。</p><p class="exp-expect">预期：速度线性增大，高度降低。</p></div></li><li class="exp-step"><span class="exp-num">2</span><div><strong>观察碰撞</strong><p>注意触地瞬间的速度突变。</p><p class="exp-expect">预期：速度反向、幅度减小（能量损耗）。</p></div></li><li class="exp-step"><span class="exp-num">3</span><div><strong>多次弹跳</strong><p>连续观察若干次弹跳高度。</p><p class="exp-expect">预期：每次回弹高度递减，最终静止。</p></div></li></ol></section><section class="info-section"><h2 class="info-h">应用场景</h2><p class="prose">经典力学教学、碰撞与能量守恒演示。</p></section>
+    </aside>
+  </main>
+
+  <footer class="site-footer">
+    <p>基于 HTML5 Canvas + Web 技术构建 · 开源免费 · 中国大陆 &amp; 全球可访问</p>
+  </footer>
+
+  <script src="../../assets/detail.js" defer></script>
+</body>
+</html>

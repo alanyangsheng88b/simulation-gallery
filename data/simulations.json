@@ -5,9 +5,41 @@
     "title": "天线可视化",
     "titleEn": "Antenna Visualization",
     "description": "交互式天线辐射方向图可视化，展示不同天线类型的电磁辐射特性",
-    "tags": ["天线", "辐射方向图", "可视化"],
-    "path": "sims/antenna/antenna-visualization.html",
-    "version": "1.0"
+    "tags": [
+      "天线",
+      "辐射方向图",
+      "可视化"
+    ],
+    "path": "sims/own/antenna/antenna-visualization.html",
+    "version": "1.0",
+    "difficulty": "beginner",
+    "source": "原创",
+    "license": "own",
+    "theory": "通过三维辐射方向图直观展示不同天线类型的远场辐射强度分布。方向图是天线增益随空间角度变化的函数，是评估天线覆盖能力最直观的方式。",
+    "formulas": [
+      {
+        "expression": "F(θ,φ) = √(G(θ,φ))",
+        "label": "归一化方向图函数"
+      }
+    ],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "射频工程师选型与波束覆盖评估、天线教学演示。",
+    "videos": [],
+    "relatedSimulations": [
+      "dipole-em-wave",
+      "omni-directional-radiation",
+      "antenna-radiation-sim",
+      "radar-equation",
+      "dipole-antenna-4",
+      "dipole-antenna-eda",
+      "em-dipole-field-2",
+      "dipole-e-field-lines",
+      "phased-array-radar",
+      "vector-magnetic-potential"
+    ]
   },
   {
     "id": "dipole-em-wave",
@@ -15,9 +47,62 @@
     "title": "偶极子电磁波",
     "titleEn": "Dipole Electromagnetic Wave",
     "description": "偶极子天线产生的电磁波传播动画，直观展示电场与磁场的正交关系",
-    "tags": ["偶极子", "电磁波", "电场", "磁场"],
-    "path": "sims/antenna/偶极子电磁波.html",
-    "version": "1.0"
+    "tags": [
+      "偶极子",
+      "电磁波",
+      "电场",
+      "磁场"
+    ],
+    "path": "sims/own/antenna/偶极子电磁波.html",
+    "version": "1.0",
+    "difficulty": "beginner",
+    "source": "原创",
+    "license": "own",
+    "theory": "偶极子天线由时变电流激励，其周围产生交变电场与磁场；二者相互垂直并同时垂直于传播方向，构成横电磁波（TEM）。本仿真展示电场线随电流的生灭与向外传播。",
+    "formulas": [
+      {
+        "expression": "E_θ = j η (k I₀ l / 4π r) e^{-jkr} sinθ",
+        "label": "短偶极子远场电场"
+      },
+      {
+        "expression": "H_φ = E_θ / η",
+        "label": "远场磁场"
+      }
+    ],
+    "experiment": {
+      "summary": "观察偶极子周围电场与磁场的空间关系",
+      "steps": [
+        {
+          "title": "启动电流",
+          "instruction": "点击播放，观察电流从 0 增大到峰值。",
+          "expected": "电场线从电荷处向外生长。"
+        },
+        {
+          "title": "观察传播",
+          "instruction": "跟随电场线的向外运动。",
+          "expected": "波形以光速向外扩散，E 与 H 相互正交。"
+        },
+        {
+          "title": "改变频率",
+          "instruction": "调高频率后观察波长变化。",
+          "expected": "波长变短，相同距离内周期数增多。"
+        }
+      ]
+    },
+    "application": "理解电磁波本质、天线辐射入门。",
+    "videos": [],
+    "relatedSimulations": [
+      "antenna-visualization",
+      "omni-directional-radiation",
+      "antenna-radiation-sim",
+      "radar-equation",
+      "dipole-antenna-4",
+      "dipole-antenna-eda",
+      "em-dipole-field-2",
+      "dipole-e-field-lines",
+      "phased-array-radar",
+      "vector-magnetic-potential"
+    ]
   },
   {
     "id": "omni-directional-radiation",
@@ -25,9 +110,37 @@
     "title": "全向与定向辐射",
     "titleEn": "Omni vs Directional Radiation",
     "description": "对比全向天线与定向天线的辐射模式，展示波束形成的基本原理",
-    "tags": ["全向天线", "定向天线", "波束", "对比"],
-    "path": "sims/antenna/全向与定向辐射.html",
-    "version": "1.0"
+    "tags": [
+      "全向天线",
+      "定向天线",
+      "波束",
+      "对比"
+    ],
+    "path": "sims/own/antenna/全向与定向辐射.html",
+    "version": "1.0",
+    "difficulty": "beginner",
+    "source": "原创",
+    "license": "own",
+    "theory": "全向天线在水平面近似均匀辐射（如垂直偶极子），定向天线通过阵元干涉将能量集中到特定方向，形成高增益波束。二者对比揭示了波束赋形与增益的权衡。",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "基站天线选型、室内覆盖设计。",
+    "videos": [],
+    "relatedSimulations": [
+      "antenna-visualization",
+      "dipole-em-wave",
+      "antenna-radiation-sim",
+      "radar-equation",
+      "dipole-antenna-4",
+      "dipole-antenna-eda",
+      "em-dipole-field-2",
+      "dipole-e-field-lines",
+      "phased-array-radar",
+      "vector-magnetic-potential"
+    ]
   },
   {
     "id": "antenna-radiation-sim",
@@ -35,9 +148,36 @@
     "title": "天线辐射仿真",
     "titleEn": "Antenna Radiation Simulation",
     "description": "综合天线辐射仿真工具，支持参数调节与实时辐射图更新",
-    "tags": ["天线", "辐射仿真", "参数调节"],
-    "path": "sims/antenna/天线辐射仿真.html",
-    "version": "1.0"
+    "tags": [
+      "天线",
+      "辐射仿真",
+      "参数调节"
+    ],
+    "path": "sims/own/antenna/天线辐射仿真.html",
+    "version": "1.0",
+    "difficulty": "intermediate",
+    "source": "原创",
+    "license": "own",
+    "theory": "综合辐射仿真工具：调节频率、阵元数、间距等参数，实时更新方向图与关键指标（增益、波束宽度、旁瓣）。",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "天线参数扫描与教学实验。",
+    "videos": [],
+    "relatedSimulations": [
+      "antenna-visualization",
+      "dipole-em-wave",
+      "omni-directional-radiation",
+      "radar-equation",
+      "dipole-antenna-4",
+      "dipole-antenna-eda",
+      "em-dipole-field-2",
+      "dipole-e-field-lines",
+      "phased-array-radar",
+      "vector-magnetic-potential"
+    ]
   },
   {
     "id": "radar-equation",
@@ -45,9 +185,42 @@
     "title": "雷达方程与窄波束",
     "titleEn": "Radar Equation & Narrow Beam",
     "description": "雷达方程计算器与窄波束电磁辐射仿真，理解雷达探测原理",
-    "tags": ["雷达", "方程", "窄波束", "电磁辐射"],
-    "path": "sims/antenna/雷达方程与窄波束电磁辐射仿真.html",
-    "version": "1.0"
+    "tags": [
+      "雷达",
+      "方程",
+      "窄波束",
+      "电磁辐射"
+    ],
+    "path": "sims/own/antenna/雷达方程与窄波束电磁辐射仿真.html",
+    "version": "1.0",
+    "difficulty": "intermediate",
+    "source": "原创",
+    "license": "own",
+    "theory": "雷达方程描述了接收功率与发射功率、天线增益、目标 RCS、距离之间的定量关系。窄波束通过高增益天线获得更远探测距离，但搜索范围变窄。",
+    "formulas": [
+      {
+        "expression": "P_r = (P_t G² λ² σ) / ((4π)³ R⁴)",
+        "label": "雷达方程（单站）"
+      }
+    ],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "雷达探测距离预算、传感器设计。",
+    "videos": [],
+    "relatedSimulations": [
+      "antenna-visualization",
+      "dipole-em-wave",
+      "omni-directional-radiation",
+      "antenna-radiation-sim",
+      "dipole-antenna-4",
+      "dipole-antenna-eda",
+      "em-dipole-field-2",
+      "dipole-e-field-lines",
+      "phased-array-radar",
+      "vector-magnetic-potential"
+    ]
   },
   {
     "id": "birth-of-antenna",
@@ -55,9 +228,40 @@
     "title": "天线的诞生",
     "titleEn": "Birth of an Antenna",
     "description": "麦克斯韦电磁辐射与干涉相消物理可视化 — 探索天线如何将导行波转化为自由空间电磁波",
-    "tags": ["麦克斯韦", "干涉相消", "电磁辐射", "物理可视化"],
-    "path": "sims/field-kinematics/天线的诞生.html",
-    "version": "1"
+    "tags": [
+      "麦克斯韦",
+      "干涉相消",
+      "电磁辐射",
+      "物理可视化"
+    ],
+    "path": "sims/own/field-kinematics/天线的诞生.html",
+    "version": "1",
+    "difficulty": "beginner",
+    "source": "原创",
+    "license": "own",
+    "theory": "麦克斯韦方程组预言变化的电场产生磁场、变化的磁场产生电场，从而以波的形式在自由空间传播。当天线中的导行波无法被传输线约束时，能量便以电磁辐射的形式释放——这就是天线诞生的本质。",
+    "formulas": [
+      {
+        "expression": "∇×E = -∂B/∂t",
+        "label": "法拉第定律"
+      },
+      {
+        "expression": "∇×H = J + ∂D/∂t",
+        "label": "安培-麦克斯韦定律"
+      }
+    ],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "电磁学入门、天线原理教学。",
+    "videos": [],
+    "relatedSimulations": [
+      "birth-of-antenna-2",
+      "birth-of-antenna-3",
+      "birth-of-antenna-4",
+      "birth-of-antenna-5"
+    ]
   },
   {
     "id": "birth-of-antenna-2",
@@ -65,9 +269,31 @@
     "title": "天线的诞生 v2",
     "titleEn": "Birth of an Antenna v2",
     "description": "增强版：更丰富的场线动画与交互控制，深入理解近场到远场的过渡",
-    "tags": ["麦克斯韦", "近场", "远场", "场线动画"],
-    "path": "sims/field-kinematics/天线的诞生1.html",
-    "version": "2"
+    "tags": [
+      "麦克斯韦",
+      "近场",
+      "远场",
+      "场线动画"
+    ],
+    "path": "sims/own/field-kinematics/天线的诞生1.html",
+    "version": "2",
+    "difficulty": "beginner",
+    "source": "原创",
+    "license": "own",
+    "theory": "在 v1 基础上增强场线动画，展示近场（感应场）到远场（辐射场）的过渡——近场能量在源附近振荡而不辐射，远场能量脱离源向外传播。",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "近场/远场概念教学。",
+    "videos": [],
+    "relatedSimulations": [
+      "birth-of-antenna",
+      "birth-of-antenna-3",
+      "birth-of-antenna-4",
+      "birth-of-antenna-5"
+    ]
   },
   {
     "id": "birth-of-antenna-3",
@@ -75,9 +301,30 @@
     "title": "天线的诞生 v3",
     "titleEn": "Birth of an Antenna v3",
     "description": "加入时域演化和多频率分析，观察不同频率下的辐射模式变化",
-    "tags": ["时域演化", "多频率", "辐射模式"],
-    "path": "sims/field-kinematics/天线的诞生2.html",
-    "version": "3"
+    "tags": [
+      "时域演化",
+      "多频率",
+      "辐射模式"
+    ],
+    "path": "sims/own/field-kinematics/天线的诞生2.html",
+    "version": "3",
+    "difficulty": "intermediate",
+    "source": "原创",
+    "license": "own",
+    "theory": "加入时域演化与多频率分析，观察不同频率下辐射模式与波长的变化关系，理解频率对天线电尺寸的决定性影响。",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "频率-电尺寸关系教学。",
+    "videos": [],
+    "relatedSimulations": [
+      "birth-of-antenna",
+      "birth-of-antenna-2",
+      "birth-of-antenna-4",
+      "birth-of-antenna-5"
+    ]
   },
   {
     "id": "birth-of-antenna-4",
@@ -85,9 +332,31 @@
     "title": "天线的诞生 v4",
     "titleEn": "Birth of an Antenna v4",
     "description": "增加干涉相消的定量分析，可视化驻波与行波的转换过程",
-    "tags": ["干涉相消", "驻波", "行波", "定量分析"],
-    "path": "sims/field-kinematics/天线的诞生3.html",
-    "version": "4"
+    "tags": [
+      "干涉相消",
+      "驻波",
+      "行波",
+      "定量分析"
+    ],
+    "path": "sims/own/field-kinematics/天线的诞生3.html",
+    "version": "4",
+    "difficulty": "intermediate",
+    "source": "原创",
+    "license": "own",
+    "theory": "增加干涉相消的定量分析，可视化驻波（能量储存）与行波（能量传播）的转换过程，揭示天线为何能有效辐射。",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "驻波/行波与辐射效率教学。",
+    "videos": [],
+    "relatedSimulations": [
+      "birth-of-antenna",
+      "birth-of-antenna-2",
+      "birth-of-antenna-3",
+      "birth-of-antenna-5"
+    ]
   },
   {
     "id": "birth-of-antenna-5",
@@ -95,9 +364,31 @@
     "title": "天线的诞生 v5",
     "titleEn": "Birth of an Antenna v5",
     "description": "终极版：完整的麦克斯韦方程组可视化，包含边界条件与阻抗匹配动画",
-    "tags": ["麦克斯韦方程组", "边界条件", "阻抗匹配", "完整版"],
-    "path": "sims/field-kinematics/天线的诞生4.html",
-    "version": "5"
+    "tags": [
+      "麦克斯韦方程组",
+      "边界条件",
+      "阻抗匹配",
+      "完整版"
+    ],
+    "path": "sims/own/field-kinematics/天线的诞生4.html",
+    "version": "5",
+    "difficulty": "advanced",
+    "source": "原创",
+    "license": "own",
+    "theory": "完整麦克斯韦方程组可视化，包含边界条件与阻抗匹配的动画演示，呈现从源到自由空间电磁波的全链路物理过程。",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "电磁场完整体系教学。",
+    "videos": [],
+    "relatedSimulations": [
+      "birth-of-antenna",
+      "birth-of-antenna-2",
+      "birth-of-antenna-3",
+      "birth-of-antenna-4"
+    ]
   },
   {
     "id": "bouncing-ball",
@@ -105,9 +396,51 @@
     "title": "拍篮球物理仿真",
     "titleEn": "Bouncing Ball Physics",
     "description": "经典物理力学仿真：篮球自由落体与弹性碰撞，实时显示速度、加速度与能量转换",
-    "tags": ["物理", "力学", "弹性碰撞", "能量守恒"],
-    "path": "sims/mechanics/拍篮球.html",
-    "version": "1.0"
+    "tags": [
+      "物理",
+      "力学",
+      "弹性碰撞",
+      "能量守恒"
+    ],
+    "path": "sims/own/mechanics/拍篮球.html",
+    "version": "1.0",
+    "difficulty": "beginner",
+    "source": "原创",
+    "license": "own",
+    "theory": "篮球自由下落时重力势能转化为动能，与地面碰撞时发生弹性/非弹性碰撞，部分能量以热和形变耗散。实时显示速度、加速度与机械能变化，直观呈现能量守恒与损耗。",
+    "formulas": [
+      {
+        "expression": "v = √(2gh)",
+        "label": "自由落体末速度"
+      },
+      {
+        "expression": "E = mgh + ½mv²",
+        "label": "机械能"
+      }
+    ],
+    "experiment": {
+      "summary": "观察弹跳中的能量转换",
+      "steps": [
+        {
+          "title": "释放篮球",
+          "instruction": "点击释放，观察下落过程的速度变化。",
+          "expected": "速度线性增大，高度降低。"
+        },
+        {
+          "title": "观察碰撞",
+          "instruction": "注意触地瞬间的速度突变。",
+          "expected": "速度反向、幅度减小（能量损耗）。"
+        },
+        {
+          "title": "多次弹跳",
+          "instruction": "连续观察若干次弹跳高度。",
+          "expected": "每次回弹高度递减，最终静止。"
+        }
+      ]
+    },
+    "application": "经典力学教学、碰撞与能量守恒演示。",
+    "videos": [],
+    "relatedSimulations": []
   },
   {
     "id": "circuit-simulator",
@@ -115,9 +448,27 @@
     "title": "电路仿真器",
     "titleEn": "Circuit Simulator (EDA)",
     "description": "原理图编辑器 + DC 工作点分析 + 波形查看器，支持电阻/电压源/电流源/接地，基于 MNA 求解器",
-    "tags": ["电路", "EDA", "SPICE", "MNA", "React"],
-    "path": "sims/circuit/index.html",
-    "version": "1.0"
+    "tags": [
+      "电路",
+      "EDA",
+      "SPICE",
+      "MNA",
+      "React"
+    ],
+    "path": "sims/own/circuit/index.html",
+    "version": "1.0",
+    "difficulty": "intermediate",
+    "source": "原创",
+    "license": "own",
+    "theory": "基于改进节点分析法（MNA）求解电路微分代数方程，得到各节点电压与支路电流；配合原理图编辑与波形查看，构成轻量 EDA 工具。",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "电路原理教学、小型电路验证。",
+    "videos": [],
+    "relatedSimulations": []
   },
   {
     "id": "dipole-antenna-4",
@@ -125,9 +476,47 @@
     "title": "EDA 级天线射频仿真系统",
     "titleEn": "EDA-Grade Antenna RF Simulation",
     "description": "端到端天线射频仿真系统：S参数分析、阻抗匹配、驻波比计算与辐射效率评估",
-    "tags": ["天线", "射频", "S参数", "阻抗匹配", "EDA"],
-    "path": "sims/antenna/偶极子天线4.html",
-    "version": "1.0"
+    "tags": [
+      "天线",
+      "射频",
+      "S参数",
+      "阻抗匹配",
+      "EDA"
+    ],
+    "path": "sims/own/antenna/偶极子天线4.html",
+    "version": "1.0",
+    "difficulty": "advanced",
+    "source": "原创",
+    "license": "own",
+    "theory": "端到端天线射频仿真：基于 S 参数提取输入/反向损耗，计算阻抗匹配与驻波比（VSWR），评估辐射效率。覆盖从建模到指标分析的完整流程。",
+    "formulas": [
+      {
+        "expression": "VSWR = (1+|Γ|)/(1-|Γ|)",
+        "label": "电压驻波比"
+      },
+      {
+        "expression": "Γ = (Z_L - Z₀)/(Z_L + Z₀)",
+        "label": "反射系数"
+      }
+    ],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "射频天线设计与指标验证。",
+    "videos": [],
+    "relatedSimulations": [
+      "antenna-visualization",
+      "dipole-em-wave",
+      "omni-directional-radiation",
+      "antenna-radiation-sim",
+      "radar-equation",
+      "dipole-antenna-eda",
+      "em-dipole-field-2",
+      "dipole-e-field-lines",
+      "phased-array-radar",
+      "vector-magnetic-potential"
+    ]
   },
   {
     "id": "dipole-antenna-eda",
@@ -135,9 +524,37 @@
     "title": "天线偶极子 EDA 仿真系统",
     "titleEn": "Dipole Antenna EDA Simulation",
     "description": "EDA风格偶极子天线设计与分析工具，可视化天线电流分布与方向图",
-    "tags": ["偶极子", "天线设计", "电流分布", "方向图"],
-    "path": "sims/antenna/偶极子天线辐射方向.html",
-    "version": "1.0"
+    "tags": [
+      "偶极子",
+      "天线设计",
+      "电流分布",
+      "方向图"
+    ],
+    "path": "sims/own/antenna/偶极子天线辐射方向.html",
+    "version": "1.0",
+    "difficulty": "advanced",
+    "source": "原创",
+    "license": "own",
+    "theory": "EDA 风格偶极子天线设计工具，可视化电流分布与辐射方向图，支持参数化扫描以优化增益与带宽。",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "偶极子天线设计与优化。",
+    "videos": [],
+    "relatedSimulations": [
+      "antenna-visualization",
+      "dipole-em-wave",
+      "omni-directional-radiation",
+      "antenna-radiation-sim",
+      "radar-equation",
+      "dipole-antenna-4",
+      "em-dipole-field-2",
+      "dipole-e-field-lines",
+      "phased-array-radar",
+      "vector-magnetic-potential"
+    ]
   },
   {
     "id": "em-dipole-field-2",
@@ -145,9 +562,38 @@
     "title": "EDA 电磁偶极天线辐射场仿真器",
     "titleEn": "EDA EM Dipole Radiation Field Simulator",
     "description": "电磁偶极天线近场与远场辐射仿真，包含场强分布与极化分析",
-    "tags": ["电磁偶极", "辐射场", "近场", "远场", "极化"],
-    "path": "sims/antenna/偶极子电磁波2.html",
-    "version": "1.0"
+    "tags": [
+      "电磁偶极",
+      "辐射场",
+      "近场",
+      "远场",
+      "极化"
+    ],
+    "path": "sims/own/antenna/偶极子电磁波2.html",
+    "version": "1.0",
+    "difficulty": "advanced",
+    "source": "原创",
+    "license": "own",
+    "theory": "仿真电磁偶极天线的近场与远场辐射，展示场强空间分布与极化特性，帮助理解辐射场的矢量本质。",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "辐射场分析与极化研究。",
+    "videos": [],
+    "relatedSimulations": [
+      "antenna-visualization",
+      "dipole-em-wave",
+      "omni-directional-radiation",
+      "antenna-radiation-sim",
+      "radar-equation",
+      "dipole-antenna-4",
+      "dipole-antenna-eda",
+      "dipole-e-field-lines",
+      "phased-array-radar",
+      "vector-magnetic-potential"
+    ]
   },
   {
     "id": "dipole-e-field-lines",
@@ -155,9 +601,38 @@
     "title": "偶极子电场线 — 生成过程全可视化",
     "titleEn": "Dipole E-Field Lines — Full Generation Visualization",
     "description": "逐步展示偶极子电场线从电荷分离到稳态的完整生成过程，直观理解电场本质",
-    "tags": ["电场线", "偶极子", "电荷", "生成过程", "可视化"],
-    "path": "sims/antenna/偶极子电磁波3.html",
-    "version": "1.0"
+    "tags": [
+      "电场线",
+      "偶极子",
+      "电荷",
+      "生成过程",
+      "可视化"
+    ],
+    "path": "sims/own/antenna/偶极子电磁波3.html",
+    "version": "1.0",
+    "difficulty": "beginner",
+    "source": "原创",
+    "license": "own",
+    "theory": "逐步展示偶极子电场线从电荷分离到稳态的完整生成过程，揭示电场作为矢量场的本质与边界形态。",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "电场概念教学。",
+    "videos": [],
+    "relatedSimulations": [
+      "antenna-visualization",
+      "dipole-em-wave",
+      "omni-directional-radiation",
+      "antenna-radiation-sim",
+      "radar-equation",
+      "dipole-antenna-4",
+      "dipole-antenna-eda",
+      "em-dipole-field-2",
+      "phased-array-radar",
+      "vector-magnetic-potential"
+    ]
   },
   {
     "id": "phased-array-radar",
@@ -165,9 +640,63 @@
     "title": "相控阵天线波束赋形仿真",
     "titleEn": "Phased Array Beamforming Simulation",
     "description": "相控阵雷达波束赋形仿真：阵元相位控制、波束扫描、方向图合成与栅瓣分析",
-    "tags": ["相控阵", "波束赋形", "雷达", "相位控制", "方向图合成"],
-    "path": "sims/antenna/相控阵雷达.html",
-    "version": "1.0"
+    "tags": [
+      "相控阵",
+      "波束赋形",
+      "雷达",
+      "相位控制",
+      "方向图合成"
+    ],
+    "path": "sims/own/antenna/相控阵雷达.html",
+    "version": "1.0",
+    "difficulty": "advanced",
+    "source": "原创",
+    "license": "own",
+    "theory": "通过控制各阵元馈电的相位差，使远场波前相干叠加，实现波束的电子扫描而无需机械转动。阵因子决定了主瓣方向与栅瓣出现条件。",
+    "formulas": [
+      {
+        "expression": "AF(θ) = Σ e^{j k d (n-1)(sinθ - sinθ₀)}",
+        "label": "均匀线阵阵因子"
+      },
+      {
+        "expression": "d/λ > 1 + |sinθ₀|",
+        "label": "无栅瓣条件"
+      }
+    ],
+    "experiment": {
+      "summary": "体验电子波束扫描",
+      "steps": [
+        {
+          "title": "设置相位差",
+          "instruction": "调节阵元相位差 Δφ。",
+          "expected": "主瓣方向随之偏转。"
+        },
+        {
+          "title": "扫描波束",
+          "instruction": "连续改变 Δφ 扫描 0°~60°。",
+          "expected": "波束平滑电子扫描，无机械转动。"
+        },
+        {
+          "title": "观察栅瓣",
+          "instruction": "增大阵元间距 d 超过 λ。",
+          "expected": "出现不期望的栅瓣。"
+        }
+      ]
+    },
+    "application": "雷达、5G 大规模 MIMO、卫星通信。",
+    "videos": [],
+    "relatedSimulations": [
+      "antenna-visualization",
+      "dipole-em-wave",
+      "omni-directional-radiation",
+      "antenna-radiation-sim",
+      "radar-equation",
+      "dipole-antenna-4",
+      "dipole-antenna-eda",
+      "em-dipole-field-2",
+      "dipole-e-field-lines",
+      "vector-magnetic-potential"
+    ]
   },
   {
     "id": "vector-magnetic-potential",
@@ -175,8 +704,46 @@
     "title": "矢量磁位 & 偶极子辐射场仿真",
     "titleEn": "Vector Magnetic Potential & Dipole Radiation",
     "description": "基于矢量磁位 A 推导偶极子辐射场，可视化磁矢势、电场与磁场的完备关系",
-    "tags": ["矢量磁位", "磁矢势", "辐射场", "偶极子", "EDA"],
-    "path": "sims/antenna/矢量磁位.html",
-    "version": "1.0"
+    "tags": [
+      "矢量磁位",
+      "磁矢势",
+      "辐射场",
+      "偶极子",
+      "EDA"
+    ],
+    "path": "sims/own/antenna/矢量磁位.html",
+    "version": "1.0",
+    "difficulty": "advanced",
+    "source": "原创",
+    "license": "own",
+    "theory": "引入矢量磁位 A（B = ∇×A）可大幅简化辐射场推导。由电流元产生的 A 出发，可解析得到偶极子的电场、磁场与完备的矢量关系。",
+    "formulas": [
+      {
+        "expression": "B = ∇×A",
+        "label": "磁感应强度"
+      },
+      {
+        "expression": "A = μ₀/(4π) ∫ J e^{-jkr}/r dV",
+        "label": "矢量磁位积分式"
+      }
+    ],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "电磁辐射理论推导、天线建模。",
+    "videos": [],
+    "relatedSimulations": [
+      "antenna-visualization",
+      "dipole-em-wave",
+      "omni-directional-radiation",
+      "antenna-radiation-sim",
+      "radar-equation",
+      "dipole-antenna-4",
+      "dipole-antenna-eda",
+      "em-dipole-field-2",
+      "dipole-e-field-lines",
+      "phased-array-radar"
+    ]
   }
 ]

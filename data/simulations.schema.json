@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://alanalan.cn/schemas/simulations.schema.json",
+  "title": "Simulation Gallery Metadata",
+  "description": "电子仿真画廊仿真元数据结构（对应《项目需求基线 V1.0》第三节内容模型）。每个数组元素描述一个仿真。",
+  "type": "array",
+  "items": { "$ref": "#/definitions/simulation" },
+  "definitions": {
+    "simulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "title", "description", "path", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "稳定 slug，同时作为路由 /simulations/<id>/ 与文件名，一经确定不可更改"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["antenna", "field-kinematics", "mechanics", "circuit"]
+        },
+        "title": { "type": "string", "description": "中文标题" },
+        "titleEn": { "type": "string", "description": "英文标题（SEO / i18n）" },
+        "description": { "type": "string", "description": "一句话简介，用于卡片与 meta description" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "path": {
+          "type": "string",
+          "description": "相对仓库根目录的仿真 HTML 路径，如 sims/own/antenna/x.html"
+        },
+        "version": { "type": "string" },
+        "difficulty": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced"],
+          "description": "难度：beginner 小白 / intermediate 初级工程师 / advanced 进阶"
+        },
+        "source": {
+          "type": "string",
+          "description": "来源/作者，如「原创」「改编自 XXX」。注意：许可证与来源须经查证后填写"
+        },
+        "license": {
+          "type": "string",
+          "enum": ["own", "mit", "apache", "gpl", "cc-by", "cc-by-sa", "unknown"],
+          "description": "许可证，决定物理存放目录 sims/<license>/"
+        },
+        "theory": {
+          "type": "string",
+          "description": "原理讲解（支持 Markdown 纯文本）。为空表示暂未撰写"
+        },
+        "formulas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["expression"],
+            "properties": {
+              "expression": { "type": "string", "description": "公式（LaTeX 或纯文本）" },
+              "label": { "type": "string", "description": "公式名称" },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "experiment": {
+          "type": "object",
+          "description": "引导式实验（Guided Experiment）",
+          "additionalProperties": false,
+          "properties": {
+            "summary": { "type": "string" },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["title", "instruction"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "instruction": { "type": "string", "description": "让用户体验的操作步骤" },
+                  "expected": { "type": "string", "description": "预期观察现象" }
+                }
+              }
+            }
+          }
+        },
+        "application": { "type": "string", "description": "实际应用场景" },
+        "videos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title", "url"],
+            "properties": {
+              "title": { "type": "string" },
+              "url": { "type": "string", "format": "uri" },
+              "platform": { "type": "string", "description": "bilibili / youtube / 其他" }
+            }
+          }
+        },
+        "relatedSimulations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "关联仿真 id 列表"
+        },
+        "updatedAt": { "type": "string", "format": "date" }
+      }
+    }
+  }
+}

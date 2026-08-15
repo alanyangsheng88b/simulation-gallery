@@ -15,7 +15,7 @@
   <meta name="twitter:description" content="交互式电子/物理仿真小程序集合">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
   <link rel="stylesheet" href="styles.css?v=2">
-  <link rel="preload" href="data/simulations.json?v=2" as="fetch" crossorigin="anonymous">
+  <link rel="preload" href="data/simulations.json?v=3" as="fetch" crossorigin="anonymous">
 </head>
 <body>
   <!-- ============================================================ -->
@@ -93,53 +93,6 @@
       <button id="retry-btn" class="retry-btn">🔄 重新加载</button>
     </div>
   </main>
-
-  <!-- ============================================================ -->
-  <!-- Modal Overlay (iframe sandbox) -->
-  <!-- ============================================================ -->
-  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="仿真运行窗口">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content">
-      <!-- Modal header -->
-      <div class="modal-header">
-        <h2 id="modal-title" class="modal-title">仿真加载中...</h2>
-        <div class="modal-actions">
-          <button id="modal-fullscreen" class="modal-btn" title="全屏" aria-label="全屏">
-            ⛶
-          </button>
-          <button id="modal-close" class="modal-btn modal-close-btn" title="关闭 (Esc)" aria-label="关闭">
-            ✕
-          </button>
-        </div>
-      </div>
-
-      <!-- Loading spinner -->
-      <div id="modal-loading" class="modal-loading" aria-live="polite">
-        <div class="spinner"></div>
-        <p class="loading-text">加载仿真中...</p>
-      </div>
-
-      <!-- Error in modal -->
-      <div id="modal-error" class="modal-error hidden" aria-live="assertive">
-        <div class="empty-icon">⚠️</div>
-        <h3 class="empty-title">仿真加载超时</h3>
-        <p class="empty-desc">网络较慢或文件较大，请重试。中国用户可尝试 GitHub Pages 备用域名</p>
-        <button id="modal-retry" class="retry-btn">🔄 重试</button>
-      </div>
-
-      <!-- iframe container -->
-      <div id="modal-iframe-wrapper" class="modal-iframe-wrapper hidden">
-        <iframe
-          id="modal-iframe"
-          title="仿真运行窗口"
-          sandbox="allow-scripts allow-same-origin"
-          loading="lazy"
-          referrerpolicy="no-referrer"
-          allow="fullscreen"
-        ></iframe>
-      </div>
-    </div>
-  </div>
 
   <!-- ============================================================ -->
   <!-- Footer -->
