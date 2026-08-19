@@ -15,6 +15,7 @@ simulation-gallery/
 ├── sims/<license>/<category>/<file>.html   # 仿真内核（iframe 源）
 │     license ∈ {own, mit, apache, gpl, cc-by, cc-by-sa, unknown}
 │     category ∈ {antenna, field-kinematics, mechanics, circuit}
+├── vendor/three/               # 本地依赖库：three core + addons（importmap 离线引用）
 ├── simulations/<id>/index.html # 仿真详情页（脚本批量生成，勿手改）
 ├── data/simulations.json       # 中心化元数据（顶层数组，[id] 唯一）
 ├── data/simulations.schema.json# JSON Schema（draft-07），字段契约
@@ -45,6 +46,14 @@ simulation-gallery/
 - 单一事实：所有仿真元数据在 `data/simulations.json`（顶层数组）。
 - 详情页由 `tools/gen-sim-pages.mjs` **全量重新生成**（幂等）。**不要手改 `simulations/<id>/index.html`**——改 json 后重新跑生成脚本。
 - 字段契约见 `.ai/knowledge/simulation-schema.md`。
+
+### 2.5 本地依赖库（vendor/three）
+- Three.js 仿真内核通过 **importmap** 引用仓库内 `vendor/three/`，**不依赖任何 CDN**（大陆网络 cdnjs 被墙、jsdelivr 慢）。
+- 内核固定位于 `sims/<license>/<category>/<id>.html`（三级深度），importmap 用相对路径 `../../../vendor/three/`。
+- 落地/更新依赖：`node tools/vendor-three.mjs`（默认 three@0.185.1；`--version` 指定；`--check` 检查本地是否齐全；`--dry-run` 仅预览）。
+- 版本约束：**three core 与 OrbitControls / stats / lil-gui 必须同版本**；升级须同步替换 vendor 内全部 4 个文件。
+- `vendor/three/` 纳入 git（GitHub Pages 离线部署需要），勿在 `.gitignore` 忽略。
+- 依赖策略总纲见 `Alanspace/threejs-电子仿真依赖与策略.md`。
 
 ## 三、新增仿真两条路径
 - 手动：按 `.ai/skills/new-simulation.md` SOP 逐步操作。

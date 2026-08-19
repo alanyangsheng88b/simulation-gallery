@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>洛伦兹力·带电粒子螺旋</title>
+<link rel="icon" href="data:," />
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #050807; overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #app { position: fixed; inset: 0; }
+  #hud {
+    position: fixed; top: 10px; right: 12px;
+    font: 12px/1.7 ui-monospace, monospace; color: #00ffff;
+    text-shadow: 0 0 6px rgba(0,255,255,.6); pointer-events: none;
+    white-space: pre; text-align: left;
+  }
+  #hint {
+    position: fixed; left: 12px; bottom: 10px;
+    font: 11px/1.5 ui-monospace, monospace; color: #6b7a82; pointer-events: none;
+  }
+</style>
+<!-- 本地依赖库：importmap 指向仓库 vendor/three（三级深度相对路径，离线可用，不依赖 CDN） -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "../../../vendor/three/three.module.js",
+    "three/addons/": "../../../vendor/three/addons/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud"></div>
+<div id="hint">拖拽旋转 · 滚轮缩放 · 右侧面板调参（B / q / m / 初速度 / 俯仰角）</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import Stats from 'three/addons/libs/stats.module.js';
+import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+// ---- 静态体检 4 项（来自 threejs-电子仿真依赖与策略.md）----
+// 1) 每个 new THREE.Group/Mesh 必须 scene.add() 或挂到已挂载父组
+// 2) 顶层调用(init/animate) 必须在所有 let/const 声明之后
+// 3) animate() 引用的变量必须在其可访问作用域（跨函数状态提升到顶层）
+// 4) 依赖来自本地 vendor（importmap 已映射，离线可用）
+
+// ---- 顶层状态（模块作用域，供 animate 与各函数共享）----
+let scene, camera, renderer, controls, stats, gui;
+let particle, trailLine, velArrow, forceArrow, bArrow;
+const Bvec = new THREE.Vector3(0, 0, 1);   // 匀强磁场方向（+Z）
+const p = new THREE.Vector3();             // 粒子位置（仿真空间）
+const v = new THREE.Vector3();             // 粒子速度
+const viewOffset = new THREE.Vector3();    // 视图回中偏移（保持粒子在视野内）
+const clock = new THREE.Clock();
+
+const TRAIL_MAX = 900;
+const RECENTER = 6;                         // 粒子离原点超过此值则回中
+const trailPts = [];                       // 仿真空间轨迹点（Vector3）
+let trailPositions, trailColors;           // BufferAttribute 数组
+
+const params = {
+  B: 2.0,          // 磁感应强度
+  q: 1.0,          // 电荷
+  m: 1.0,          // 质量
+  v0: 5.0,         // 初速度大小
+  pitch: 30,       // 俯仰角（与 B 轴的夹角，度）
+  showField: true,
+  showTrail: true,
+  paused: false,
+  timeScale: 1.0,
+  reset: () => resetSim(),
+};
+
+// ---- 初始化 ----
+function init() {
+  const container = document.getElementById('app');
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050807);
+  scene.fog = new THREE.FogExp2(0x050807, 0.012);
+
+  camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100);
+  camera.position.set(6, 4, 9);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  container.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.target.set(0, 0, 0);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+  dir.position.set(5, 10, 7);
+  scene.add(dir);
+
+  // 参考网格（XZ 平面）与坐标轴
+  const grid = new THREE.GridHelper(20, 20, 0x113344, 0x0a1a22);
+  scene.add(grid);
+  scene.add(new THREE.AxesHelper(2.2));
+
+  // 粒子
+  const pGeo = new THREE.SphereGeometry(0.18, 24, 24);
+  const pMat = new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x004422, roughness: 0.3, metalness: 0.2 });
+  particle = new THREE.Mesh(pGeo, pMat);
+  scene.add(particle);
+
+  // 轨迹线（顶点色渐隐）
+  trailPositions = new Float32Array(TRAIL_MAX * 3);
+  trailColors = new Float32Array(TRAIL_MAX * 3);
+  const tGeo = new THREE.BufferGeometry();
+  tGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+  tGeo.setAttribute('color', new THREE.BufferAttribute(trailColors, 3));
+  tGeo.setDrawRange(0, 0);
+  const tMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 });
+  trailLine = new THREE.Line(tGeo, tMat);
+  scene.add(trailLine);
+
+  // 矢量箭头：速度(青) / 洛伦兹力(红) / 磁场(黄)
+  velArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 2, 0x33ddff, 0.4, 0.25);
+  forceArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 2, 0xff3355, 0.4, 0.25);
+  bArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), 4, 0xffdd33, 0.6, 0.35);
+  scene.add(velArrow, forceArrow, bArrow);
+
+  stats = new Stats();
+  stats.dom.style.cssText = 'position:fixed;left:8px;top:8px;';
+  document.body.appendChild(stats.dom);
+
+  buildGUI();
+  addEventListener('resize', onResize);
+  resetSim();
+}
+
+function buildGUI() {
+  gui = new GUI({ title: '洛伦兹力参数' });
+  gui.add(params, 'B', 0.2, 5, 0.1).name('磁场 B (T)').onChange(updateB);
+  gui.add(params, 'q', -2, 2, 0.1).name('电荷 q');
+  gui.add(params, 'm', 0.5, 3, 0.1).name('质量 m');
+  gui.add(params, 'v0', 1, 10, 0.1).name('初速度 v₀');
+  gui.add(params, 'pitch', 0, 90, 1).name('俯仰角 (°)');
+  gui.add(params, 'showField').name('显示磁场').onChange(v => bArrow.visible = v);
+  gui.add(params, 'showTrail').name('显示轨迹');
+  gui.add(params, 'paused').name('暂停');
+  gui.add(params, 'timeScale', 0.1, 3, 0.1).name('时间倍率');
+  gui.add(params, 'reset').name('↻ 重置');
+}
+
+function updateB() { Bvec.set(0, 0, params.B); }
+
+// ---- 重置仿真状态 ----
+function resetSim() {
+  updateB();
+  const th = THREE.MathUtils.degToRad(params.pitch);
+  const vperp = params.v0 * Math.sin(th);
+  const vpar = params.v0 * Math.cos(th);
+  // 垂直分量沿 X，平行分量沿 Z → 在 XY 平面做圆周、沿 Z 漂移成螺旋
+  v.set(vperp, 0, vpar);
+  p.set(0, 0, 0);
+  viewOffset.set(0, 0, 0);
+  trailPts.length = 0;
+  trailLine.geometry.setDrawRange(0, 0);
+}
+
+// ---- 物理积分（半隐式欧拉，子步进保证稳定）----
+function stepPhysics(dt) {
+  const sub = 6;
+  const h = dt / sub;
+  for (let i = 0; i < sub; i++) {
+    // F = q (v × B)，a = F / m
+    const fx = params.q * (v.y * Bvec.z - v.z * Bvec.y);
+    const fy = params.q * (v.z * Bvec.x - v.x * Bvec.z);
+    const fz = params.q * (v.x * Bvec.y - v.y * Bvec.x);
+    v.x += (fx / params.m) * h;
+    v.y += (fy / params.m) * h;
+    v.z += (fz / params.m) * h;
+    p.x += v.x * h;
+    p.y += v.y * h;
+    p.z += v.z * h;
+  }
+  if (p.length() > RECENTER) viewOffset.copy(p); // 回中，保持视野内
+}
+
+// ---- 更新矢量箭头与轨迹 ----
+function updateVisuals() {
+  const rp = p.clone().sub(viewOffset);
+  particle.position.copy(rp);
+
+  // 速度箭头
+  velArrow.position.copy(rp);
+  if (v.lengthSq() > 1e-6) {
+    velArrow.setDirection(v.clone().normalize());
+    velArrow.setLength(Math.min(v.length() * 0.4, 4), 0.4, 0.25);
+    velArrow.visible = true;
+  } else velArrow.visible = false;
+
+  // 洛伦兹力箭头 F = q(v × B)
+  const f = new THREE.Vector3().crossVectors(v, Bvec).multiplyScalar(params.q);
+  forceArrow.position.copy(rp);
+  if (f.lengthSq() > 1e-6) {
+    forceArrow.setDirection(f.clone().normalize());
+    forceArrow.setLength(Math.min(f.length() * 0.4, 4), 0.4, 0.25);
+    forceArrow.visible = true;
+  } else forceArrow.visible = false;
+
+  bArrow.visible = params.showField;
+
+  // 轨迹
+  if (params.showTrail) {
+    trailPts.push(p.clone());
+    if (trailPts.length > TRAIL_MAX) trailPts.shift();
+    const n = trailPts.length;
+    for (let i = 0; i < n; i++) {
+      const tp = trailPts[i].clone().sub(viewOffset);
+      trailPositions[i * 3] = tp.x;
+      trailPositions[i * 3 + 1] = tp.y;
+      trailPositions[i * 3 + 2] = tp.z;
+      const a = i / n; // 头亮尾暗
+      trailColors[i * 3] = 0.0 * (1 - a) + 0.2 * a;
+      trailColors[i * 3 + 1] = 0.9 * (1 - a) + 1.0 * a;
+      trailColors[i * 3 + 2] = 0.6 * (1 - a) + 0.5 * a;
+    }
+    trailLine.geometry.setDrawRange(0, n);
+    trailLine.geometry.attributes.position.needsUpdate = true;
+    trailLine.geometry.attributes.color.needsUpdate = true;
+  } else {
+    trailLine.geometry.setDrawRange(0, 0);
+  }
+}
+
+function updateHUD() {
+  const th = THREE.MathUtils.degToRad(params.pitch);
+  const vperp = params.v0 * Math.sin(th);
+  const qw = Math.abs(params.q * params.B / params.m); // 回旋角频率 ω = |qB|/m
+  const r = params.m * vperp / (Math.abs(params.q * params.B) + 1e-6);
+  const hud = document.getElementById('hud');
+  hud.textContent =
+    `速度 |v| = ${v.length().toFixed(2)}\n` +
+    `回旋 ω = ${qw.toFixed(2)} rad/s\n` +
+    `半径 r  = ${r.toFixed(2)}\n` +
+    `绕向   = ${params.q >= 0 ? '右手' : '左手'}`;
+}
+
+function onResize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05) * params.timeScale;
+  if (!params.paused && dt > 0) stepPhysics(dt);
+  updateVisuals();
+  updateHUD();
+  controls.update();
+  renderer.render(scene, camera);
+  stats.update();
+}
+
+init();
+animate();
+</script>
+</body>
+</html>

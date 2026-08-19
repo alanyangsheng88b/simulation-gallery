@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>关于 — 电子仿真 · 小程序画廊</title>
+  <meta name="description" content="关于 alanalan.cn 电子仿真画廊">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="stylesheet" href="styles.css?v=3">
+  <script>(function(){try{var t=localStorage.getItem("alanalan-theme");document.documentElement.dataset.theme=(t==="light"?"light":"dark");}catch(e){document.documentElement.dataset.theme="dark";}})();</script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="logo" href="index.html"><span class="logo-mark">⚡</span> 电子<b>仿真</b></a>
+      <nav>
+        <ul>
+          <li><a class="nav-link" href="index.html">首页</a></li>
+          <li><a class="nav-link" href="simulations/index.html">仿真</a></li>
+          <li><a class="nav-link active" href="about.html">关于</a></li>
+          <li><a class="nav-link" href="contribute.html">贡献</a></li>
+          <span class="nav-underline"></span>
+        </ul>
+      </nav>
+      <div class="controls">
+        <button class="icon-btn" data-theme-toggle title="切换主题">🌓</button>
+        <a class="icon-btn" href="https://github.com/alanyangsheng88b/simulation-gallery" target="_blank" rel="noopener" title="GitHub">⌨</a>
+        <button class="menu-toggle" data-menu-toggle aria-label="菜单">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <h1>关于</h1>
+    <p>
+      本站是 <b>电子仿真 · 小程序画廊</b>（alanalan.cn）的官方站点，承载天线辐射、电磁场可视化、电路仿真与经典力学的交互式仿真。
+      每个仿真都是独立路由页，含原理、公式与引导实验，基于 <code>HTML5 Canvas</code> / <code>WebGL</code> / <code>three.js</code> 构建——
+      零构建步骤、开源免费、中国大陆与全球均可访问。
+    </p>
+    <p>
+      视觉系统融合自 PhysicsHub（MIT，physicshub.github.io）的架构与 UI：固定顶栏 + 滑动下划线导航、星空渐变 Hero、卡片画廊、仿真详情页（仿真常驻屏 + 右侧理论 / 公式 / 实验）。仿真内容全部来自你的自有仿真仓库，经 iframe 嵌入。
+    </p>
+  </section>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">电子<b>仿真</b> · 小程序画廊</div>
+      <div class="footer-links">
+        <a href="index.html">首页</a>
+        <a href="simulations/index.html">仿真</a>
+        <a href="about.html">关于</a>
+        <a href="contribute.html">贡献</a>
+        <a href="https://github.com/alanyangsheng88b/simulation-gallery" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <div class="footer-note">基于 HTML5 Canvas + WebGL + three.js 构建 · 开源免费 · 中国大陆 &amp; 全球可访问</div>
+    </div>
+  </footer>
+
+  <script src="assets/site.js?v=1"></script>
+</body>
+</html>

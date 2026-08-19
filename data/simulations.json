@@ -745,5 +745,39 @@
       "dipole-e-field-lines",
       "phased-array-radar"
     ]
+  },
+  {
+    "id": "lorentz-force-3d",
+    "category": "field-kinematics",
+    "title": "洛伦兹力·带电粒子螺旋",
+    "titleEn": "",
+    "description": "带电粒子在匀强磁场中受洛伦兹力做螺旋运动，可调节磁感应强度、电荷、初速度与视角",
+    "tags": [
+      "洛伦兹力",
+      "磁场",
+      "带电粒子",
+      "螺旋"
+    ],
+    "path": "sims/own/field-kinematics/lorentz-force-3d.html",
+    "version": "1.0",
+    "difficulty": "intermediate",
+    "source": "原创",
+    "license": "own",
+    "theory": "",
+    "formulas": [],
+    "experiment": {
+      "summary": "",
+      "steps": []
+    },
+    "application": "回旋加速器、磁约束（托卡马克）、质谱仪",
+    "videos": [],
+    "relatedSimulations": [
+      "birth-of-antenna",
+      "birth-of-antenna-2",
+      "birth-of-antenna-3",
+      "birth-of-antenna-4",
+      "birth-of-antenna-5"
+    ],
+    "updatedAt": "2026-08-18"
   }
 ]

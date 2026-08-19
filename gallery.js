@@ -2,8 +2,11 @@
  * gallery.js — Simulation Gallery Application
  *
  * 基线 #5：每个仿真拥有独立路由 /simulations/<id>/，不再用模态框承载仿真。
- * 本文件仅负责：加载 data/simulations.json → 渲染卡片网格 → 分类过滤。
+ * 本文件仅负责：加载 /data/simulations.json → 渲染卡片网格 → 分类过滤。
  * 卡片为 <a> 锚点，点击直接进入仿真独立详情页（由 tools/gen-sim-pages.mjs 生成）。
+ *
+ * 路径全部使用根绝对路径（/data/...、/simulations/...、/assets/...），
+ * 因此本文件既可用于站点根 index.html，也可复用于 /simulations/index.html。
  */
 
 // ============================================================
@@ -24,7 +27,19 @@ const CATEGORY_ICONS = {
   circuit: "🔌",
 };
 
-const DIFF_STARS = { beginner: "★☆☆", intermediate: "★★☆", advanced: "★★★" };
+const DIFF_META = {
+  beginner: { cls: "easy", text: "入门" },
+  intermediate: { cls: "medium", text: "进阶" },
+  advanced: { cls: "advanced", text: "高阶" },
+};
+
+// 卡片缩略图：优先用 PhysicsHub 复刻的「分类预览图」（web 优化版），缺失自动回退到 emoji
+const CAT_IMG = {
+  antenna: "cat-antenna",
+  "field-kinematics": "cat-field",
+  mechanics: "cat-mechanics",
+  circuit: "cat-circuit",
+};
 
 // ============================================================
 // DOM References
@@ -47,14 +62,21 @@ let currentCategory = "all";
 // ============================================================
 async function loadSimulations() {
   try {
-    const response = await fetch("data/simulations.json?v=3");
+    const response = await fetch("/data/simulations.json?v=3");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     simulations = await response.json();
     renderCards();
+    updateCount();
   } catch (err) {
     console.error("Failed to load simulations:", err);
     showError();
   }
+}
+
+// 把真实仿真数写回 Hero 统计（默认占位 19，加载后覆盖）
+function updateCount() {
+  const n = String(simulations.length);
+  document.querySelectorAll(".js-sim-count").forEach((el) => (el.textContent = n));
 }
 
 // ============================================================
@@ -83,34 +105,32 @@ function renderCards() {
 }
 
 function buildCard(sim) {
-  const categoryLabel = CATEGORY_META[sim.category]?.label || sim.category;
-  const icon = CATEGORY_ICONS[sim.category] || "🔬";
-  const stars = DIFF_STARS[sim.difficulty] || "★☆☆";
-  const diffText = { beginner: "入门", intermediate: "进阶", advanced: "高阶" }[sim.difficulty] || "";
+  const cat = sim.category;
+  const meta = CATEGORY_META[cat] || { label: cat, icon: "🔬" };
+  const icon = CATEGORY_ICONS[cat] || "🔬";
+  const diff = DIFF_META[sim.difficulty] || DIFF_META.beginner;
+  const imgName = CAT_IMG[cat];
+  const img = imgName ? `/assets/images/web/${imgName}_1.png` : "";
+  const tags = (sim.tags || []).map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join("");
+  const href = `/simulations/${sim.id}/`;
 
   return `
-    <a
-      class="sim-card"
-      href="simulations/${sim.id}/"
-      data-category="${sim.category}"
-      aria-label="打开 ${escapeHtml(sim.title)}"
-    >
-      <div class="card-thumbnail" data-category="${sim.category}">
-        <span class="card-thumbnail-icon">${icon}</span>
-        <span class="card-badge">${categoryLabel}</span>
-      </div>
-      <div class="card-body">
-        <h3 class="card-title">${escapeHtml(sim.title)}</h3>
-        <p class="card-desc">${escapeHtml(sim.description)}</p>
-        <div class="card-tags">
-          ${sim.tags.map((t) => `<span class="card-tag">#${escapeHtml(t)}</span>`).join("")}
+    <article class="sim-card" data-category="${cat}">
+      <a class="sim-card__thumb" href="${href}" data-category="${cat}" aria-label="打开 ${escapeHtml(sim.title)}">
+        ${img ? `<img class="sim-card__thumb-img" src="${img}" alt="" loading="lazy" onerror="this.remove()">` : ""}
+        <span class="card-thumb-icon">${icon}</span>
+      </a>
+      <div class="sim-card__body">
+        <a class="sim-card__title" href="${href}">${escapeHtml(sim.title)}</a>
+        <p class="sim-card__desc">${escapeHtml(sim.description)}</p>
+        <div class="sim-card__meta">
+          <span class="tag tag--cat">${meta.icon} ${meta.label}</span>
+          <span class="tag tag--${diff.cls}">${diff.text}</span>
+          ${tags}
         </div>
+        <a class="btn btn--ghost sim-card__run" href="${href}">▶ 打开仿真</a>
       </div>
-      <div class="card-meta">
-        <span class="card-diff" title="难度">${stars} ${diffText}</span>
-        <span class="card-action">▶ 打开仿真</span>
-      </div>
-    </a>
+    </article>
   `;
 }
 

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>__TITLE__</title>
+<link rel="icon" href="data:," />
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #050807; overflow: hidden; }
+  #app { position: fixed; inset: 0; }
+  #hud {
+    position: fixed; top: 10px; right: 12px;
+    font: 12px/1.6 ui-monospace, monospace; color: #00ffff;
+    text-shadow: 0 0 6px rgba(0, 255, 255, .6); pointer-events: none;
+  }
+</style>
+<!-- 本地依赖库：importmap 指向仓库 vendor/three（三级深度相对路径，离线可用，不依赖 CDN） -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "../../../vendor/three/three.module.js",
+    "three/addons/": "../../../vendor/three/addons/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">__TITLE__</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import Stats from 'three/addons/libs/stats.module.js';
+
+// ---- 静态体检 4 项（来自 threejs-电子仿真依赖与策略.md）----
+// 1) 每个 new THREE.Group/Mesh 必须 scene.add() 或挂到已挂载父组
+// 2) 顶层调用(init/animate) 必须在所有 let/const 声明之后
+// 3) animate() 引用的变量必须在其可访问作用域（跨函数状态提升到顶层）
+// 4) 依赖来自本地 vendor（importmap 已映射，离线可用）
+
+const container = document.getElementById('app');
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050807);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(3, 2, 4);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 0, 0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+dir.position.set(5, 10, 7);
+scene.add(dir);
+
+// 示例网格（教学型可视化占位，替换为真实仿真）
+const group = new THREE.Group();
+const geo = new THREE.IcosahedronGeometry(1, 2);
+const mat = new THREE.MeshStandardMaterial({ color: 0x00ff66, roughness: 0.3, metalness: 0.1, wireframe: true });
+const mesh = new THREE.Mesh(geo, mat);
+group.add(mesh);
+scene.add(group); // 组必须显式挂进场景图
+
+const stats = new Stats();
+stats.dom.style.cssText = 'position:fixed;left:8px;top:8px;';
+document.body.appendChild(stats.dom);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  group.rotation.y = t * 0.4;
+  mesh.rotation.x = t * 0.2;
+  controls.update();
+  renderer.render(scene, camera);
+  stats.update();
+}
+animate();
+</script>
+</body>
+</html>

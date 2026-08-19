@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>仿真列表 — 电子仿真 · 小程序画廊</title>
+  <meta name="description" content="全部交互式电子 / 物理仿真列表 — 天线辐射 · 电磁场可视化 · 电路仿真 · 经典力学">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="stylesheet" href="../styles.css?v=3">
+  <link rel="preload" href="/data/simulations.json?v=3" as="fetch" crossorigin="anonymous">
+  <script>(function(){try{var t=localStorage.getItem("alanalan-theme");document.documentElement.dataset.theme=(t==="light"?"light":"dark");}catch(e){document.documentElement.dataset.theme="dark";}})();</script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="logo" href="../index.html"><span class="logo-mark">⚡</span> 电子<b>仿真</b></a>
+      <nav>
+        <ul>
+          <li><a class="nav-link" href="../index.html">首页</a></li>
+          <li><a class="nav-link active" href="index.html">仿真</a></li>
+          <li><a class="nav-link" href="../about.html">关于</a></li>
+          <li><a class="nav-link" href="../contribute.html">贡献</a></li>
+          <span class="nav-underline"></span>
+        </ul>
+      </nav>
+      <div class="controls">
+        <button class="icon-btn" data-theme-toggle title="切换主题">🌓</button>
+        <a class="icon-btn" href="https://github.com/alanyangsheng88b/simulation-gallery" target="_blank" rel="noopener" title="GitHub">⌨</a>
+        <button class="menu-toggle" data-menu-toggle aria-label="菜单">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <h1>全部仿真</h1>
+    <p>共 <span class="js-sim-count">19</span> 个交互式仿真，覆盖天线与辐射、场动力学、力学与电路四大分类。点击任意卡片进入独立仿真页（含原理 / 公式 / 引导实验）。</p>
+  </section>
+
+  <nav class="filter-bar" aria-label="分类过滤">
+    <div class="filter-inner">
+      <button class="filter-pill active" data-category="all" aria-pressed="true"><span class="pill-icon">📂</span> 全部</button>
+      <button class="filter-pill" data-category="antenna" aria-pressed="false"><span class="pill-icon">📡</span> 天线与辐射</button>
+      <button class="filter-pill" data-category="field-kinematics" aria-pressed="false"><span class="pill-icon">🧲</span> 场动力学</button>
+      <button class="filter-pill" data-category="mechanics" aria-pressed="false"><span class="pill-icon">🏀</span> 力学</button>
+      <button class="filter-pill" data-category="circuit" aria-pressed="false"><span class="pill-icon">🔌</span> 电路</button>
+    </div>
+  </nav>
+
+  <main class="gallery-container">
+    <div id="skeleton-grid" class="card-grid" aria-label="加载中">
+      <div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+      <div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+    </div>
+    <div id="card-grid" class="card-grid hidden" aria-label="仿真列表"></div>
+    <div id="empty-state" class="empty-state hidden" aria-live="polite">
+      <div class="empty-icon">🔍</div>
+      <h3 class="empty-title">该分类暂无仿真</h3>
+      <p class="empty-desc">试试选择其他分类，或查看全部仿真</p>
+    </div>
+    <div id="error-state" class="empty-state hidden" aria-live="assertive">
+      <div class="empty-icon">⚠️</div>
+      <h3 class="empty-title">加载失败</h3>
+      <p class="empty-desc">无法加载仿真列表，请检查网络后重试</p>
+      <button id="retry-btn" class="retry-btn">🔄 重新加载</button>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">电子<b>仿真</b> · 小程序画廊</div>
+      <div class="footer-links">
+        <a href="../index.html">首页</a>
+        <a href="index.html">仿真</a>
+        <a href="../about.html">关于</a>
+        <a href="../contribute.html">贡献</a>
+        <a href="https://github.com/alanyangsheng88b/simulation-gallery" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <div class="footer-note">基于 HTML5 Canvas + WebGL + three.js 构建 · 开源免费 · 中国大陆 &amp; 全球可访问</div>
+    </div>
+  </footer>
+
+  <script src="../assets/site.js?v=1"></script>
+  <script src="../gallery.js?v=3"></script>
+</body>
+</html>

@@ -39,6 +39,15 @@ node tools/new-simulation.mjs \
 - 也可用 `--config ./my-sim.json` 传入完整 JSON（含 `theory`/`formulas`/`experiment`/`videos`）。
 - 关联仿真默认自动填入同分类其它 id（可在生成后手改 json）。
 
+## 引擎（依赖来源）
+- 默认 `--engine canvas`：纯 Canvas 2D 占位（向后兼容现有行为）。
+- `--engine three`：生成含 **importmap 本地依赖**的 Three.js 内核骨架，引用仓库 `vendor/three/`（离线、不依赖 CDN）。
+  - 首次使用前须落地本地依赖库：`node tools/vendor-three.mjs`（默认 three@0.185.1，OrbitControls/stats/lil-gui 同版本一起下载）。
+  - 内核固定位于 `sims/<license>/<category>/<id>.html`，importmap 用相对路径 `../../../vendor/three/`。
+  - 升级 three 时须同步升级 vendor 内全部 4 个文件（版本必须一致，否则白屏）。
+  - 下载前可用 `node tools/vendor-three.mjs --dry-run` 预览、`--check` 检查本地是否齐全。
+- 依赖策略总纲见 `Alanspace/threejs-电子仿真依赖与策略.md`。
+
 ## 注意事项
 - **不要手改 `simulations/<id>/index.html`**：那是生成产物，改 json 后重跑 `gen-sim-pages.mjs` 即可。
 - `id` 不可变；`path` 必须与 `license` 目录一致。

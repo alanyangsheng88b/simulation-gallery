@@ -14,6 +14,7 @@ const dataPath = join(ROOT, "data", "simulations.json");
 const CATS = ["antenna", "field-kinematics", "mechanics", "circuit"];
 const DIFFS = ["beginner", "intermediate", "advanced"];
 const LICENSES = ["own", "mit", "apache", "gpl", "cc-by", "cc-by-sa", "unknown"];
+const ENGINES = ["canvas", "three"];
 
 function parseArgs(argv) {
   const o = {};
@@ -46,14 +47,17 @@ if (process.argv.includes("--config")) {
     console.log(`用法:
   node tools/new-simulation.mjs --id <id> --title <标题> --category <分类> \
 --difficulty <beginner|intermediate|advanced> --license <own|mit|apache|gpl|...> \
-[--description <简介>] [--titleEn <英文>] [--tags a,b,c] [--application <应用>] \
-[--theory <原理>] [--path <自定义内核路径>]
+[--engine <canvas|three>] [--description <简介>] [--titleEn <英文>] [--tags a,b,c] \
+[--application <应用>] [--theory <原理>] [--path <自定义内核路径>]
   或: node tools/new-simulation.mjs --config ./my-sim.json
 
 示例:
   node tools/new-simulation.mjs --id half-wave-dipole --title "半波偶极子" \
 --category antenna --difficulty beginner --license own \
---description "观察半波偶极子的电流、电压和辐射场"`);
+--description "观察半波偶极子的电流、电压和辐射场"
+  # 用本地 vendor/three 生成 Three.js 内核（需先 node tools/vendor-three.mjs 落地依赖）
+  node tools/new-simulation.mjs --id em-field-3d --title "电磁场 3D" \
+--category field-kinematics --difficulty intermediate --license own --engine three`);
     process.exit(0);
   }
   input = a;
@@ -61,6 +65,7 @@ if (process.argv.includes("--config")) {
 
 // ---- 校验必填与枚举 ----
 const { id, title, category, difficulty, license } = input;
+const engine = input.engine || "canvas";
 if (!id) fail("缺少 --id");
 if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) fail(`id "${id}" 不符合 slug 规则 ^[a-z0-9][a-z0-9-]*$`);
 if (!title) fail("缺少 --title");
@@ -70,6 +75,7 @@ if (!difficulty) fail("缺少 --difficulty");
 if (!DIFFS.includes(difficulty)) fail(`difficulty 非法: ${difficulty}（可选 ${DIFFS.join("/")}）`);
 if (!license) fail("缺少 --license");
 if (!LICENSES.includes(license)) fail(`license 非法: ${license}（可选 ${LICENSES.join("/")}）`);
+if (!ENGINES.includes(engine)) fail(`engine 非法: ${engine}（可选 ${ENGINES.join("/")}）`);
 
 // ---- 读取现有数据 ----
 let data = [];
@@ -85,7 +91,8 @@ const path = input.path || `sims/${license}/${category}/${id}.html`;
 const kernelAbs = join(ROOT, path);
 if (!existsSync(kernelAbs)) {
   mkdirSync(dirname(kernelAbs), { recursive: true });
-  writeFileSync(kernelAbs, stubHtml(title, id), "utf8");
+  const kernel = engine === "three" ? threeKernel(title, id) : stubHtml(title, id);
+  writeFileSync(kernelAbs, kernel, "utf8");
   console.log("📄 已生成内核占位:", path);
 } else {
   console.log("ℹ️ 内核已存在，跳过占位生成:", path);
@@ -136,7 +143,7 @@ try {
 
 console.log(`
 🎉 仿真「${title}」已就绪：
-   - 内核:   ${path}（占位骨架，请替换为真实仿真）
+   - 内核:   ${path}${engine === "three" ? "（Three.js 内核，importmap 引用本地 vendor/three）" : "（占位骨架，请替换为真实仿真）"}
    - 详情页: simulations/${id}/index.html
    - 元数据: data/simulations.json
 下一步：
@@ -144,6 +151,22 @@ console.log(`
    2. 补全 theory / formulas / experiment（小白用户核心内容）
    3. git add -A && git commit -m "feat: 新增仿真 ${id}"
    4. 开 PR 等待 review`);
+if (engine === "three") {
+  const vendorOk = existsSync(join(ROOT, "vendor", "three", "three.module.js"));
+  if (!vendorOk) {
+    console.log("\n⚠️ 本地依赖库缺失：运行 `node tools/vendor-three.mjs` 下载 three（importmap 已指向 ../../../vendor/three/）");
+  }
+}
+
+function threeKernel(title, id) {
+  const tplPath = join(__dirname, "three-sim.template.html");
+  let tpl;
+  try { tpl = readFileSync(tplPath, "utf8"); }
+  catch (e) { fail("读取 three 内核模板失败: " + e.message); }
+  return tpl
+    .replace(/__TITLE__/g, escapeHtml(title))
+    .replace(/__ID__/g, escapeHtml(id));
+}
 
 function stubHtml(title, id) {
   const t = escapeHtml(title);

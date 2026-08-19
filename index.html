@@ -4,88 +4,99 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>电子仿真 · 小程序画廊</title>
-  <meta name="description" content="交互式电子/物理仿真小程序集合 — 天线辐射、电磁场可视化、电路仿真器、物理力学">
-  <meta name="keywords" content="电子仿真,天线,电磁波,麦克斯韦,电路仿真,物理仿真,HTML5,Canvas">
+  <meta name="description" content="交互式电子 / 物理仿真集合 — 天线辐射 · 电磁场可视化 · 电路仿真 · 经典力学">
+  <meta name="keywords" content="电子仿真,天线,电磁波,麦克斯韦,电路仿真,物理仿真,three.js,WebGL">
   <meta property="og:title" content="电子仿真 · 小程序画廊">
-  <meta property="og:description" content="交互式电子/物理仿真小程序集合">
+  <meta property="og:description" content="交互式电子 / 物理仿真集合">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="zh_CN">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="电子仿真 · 小程序画廊">
-  <meta name="twitter:description" content="交互式电子/物理仿真小程序集合">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
-  <link rel="stylesheet" href="styles.css?v=2">
-  <link rel="preload" href="data/simulations.json?v=3" as="fetch" crossorigin="anonymous">
+  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="preload" href="/data/simulations.json?v=3" as="fetch" crossorigin="anonymous">
+  <script>(function(){try{var t=localStorage.getItem("alanalan-theme");document.documentElement.dataset.theme=(t==="light"?"light":"dark");}catch(e){document.documentElement.dataset.theme="dark";}})();</script>
 </head>
 <body>
-  <!-- ============================================================ -->
-  <!-- Header -->
-  <!-- ============================================================ -->
   <header class="site-header">
     <div class="header-inner">
-      <div class="logo">
-        <span class="logo-icon">⚡</span>
-        <h1 class="logo-title">电子仿真<span class="logo-subtitle">· 小程序画廊</span></h1>
-      </div>
-      <p class="header-desc">
-        交互式电子与物理仿真集合 — 天线辐射 · 电磁场可视化 · 电路仿真 · 经典力学
-      </p>
-      <div class="header-meta">
-        <span class="meta-badge">18 个仿真</span>
-        <span class="meta-badge">4 个分类</span>
-        <span class="meta-badge">开源免费</span>
+      <a class="logo" href="index.html"><span class="logo-mark">⚡</span> 电子<b>仿真</b></a>
+      <nav>
+        <ul>
+          <li><a class="nav-link active" href="index.html">首页</a></li>
+          <li><a class="nav-link" href="simulations/index.html">仿真</a></li>
+          <li><a class="nav-link" href="about.html">关于</a></li>
+          <li><a class="nav-link" href="contribute.html">贡献</a></li>
+          <span class="nav-underline"></span>
+        </ul>
+      </nav>
+      <div class="controls">
+        <button class="icon-btn" data-theme-toggle title="切换主题">🌓</button>
+        <a class="icon-btn" href="https://github.com/alanyangsheng88b/simulation-gallery" target="_blank" rel="noopener" title="GitHub">⌨</a>
+        <button class="menu-toggle" data-menu-toggle aria-label="菜单">☰</button>
       </div>
     </div>
   </header>
 
-  <!-- ============================================================ -->
-  <!-- Filter Bar -->
-  <!-- ============================================================ -->
+  <section class="ph-hero">
+    <div class="ph-hero__container ph-hero__container--landing">
+      <div class="ph-hero__copy">
+        <span class="ph-hero__eyebrow">⚡ 开源电子 / 物理仿真画廊</span>
+        <h1 class="ph-hero__title">用仿真看懂电子学</h1>
+        <p class="ph-hero__subtitle">交互式仿真 + 清晰理论 + 免费开源。把抽象的电磁场、电路、天线与力学原理，变成可以亲手拨弄的实时画面。</p>
+        <div class="ph-hero__ctas">
+          <a class="btn btn--primary" href="simulations/index.html">▶ 浏览 <span class="js-sim-count">19</span> 个仿真</a>
+          <a class="btn btn--ghost" href="about.html">了解更多</a>
+        </div>
+        <div class="ph-hero__stats">
+          <div class="ph-stat"><div><span class="ph-stat__value">仿真总数</span><span class="ph-stat__label js-sim-count">19</span></div></div>
+          <div class="ph-stat"><div><span class="ph-stat__value">分类</span><span class="ph-stat__label">4</span></div></div>
+          <div class="ph-stat"><div><span class="ph-stat__value">许可</span><span class="ph-stat__label">开源免费</span></div></div>
+        </div>
+      </div>
+      <div class="ph-hero-preview">
+        <div class="ph-hero-preview__toolbar"><span></span><span></span><span></span><strong>Live Simulation</strong></div>
+        <div class="ph-hero-preview__stage">
+          <div class="ph-hero-preview__scan"></div>
+          <div class="ph-orbit ph-orbit--outer"></div>
+          <div class="ph-orbit ph-orbit--inner"></div>
+          <div class="ph-orbit ph-orbit--tilt"></div>
+          <div class="ph-hero-preview__mass ph-mass--primary"></div>
+          <div class="ph-hero-preview__mass ph-mass--secondary"></div>
+          <div class="ph-hero-preview__mass ph-mass--tertiary"></div>
+          <div class="ph-hero-preview__atom">⚛</div>
+        </div>
+        <div class="ph-hero-preview__topics">
+          <a href="simulations/antenna-visualization/">📡 天线可视化</a>
+          <a href="simulations/dipole-em-wave/">📡 偶极子电磁波</a>
+          <a href="simulations/omni-directional-radiation/">📡 全向与定向辐射</a>
+          <a href="simulations/birth-of-antenna/">🧲 天线的诞生</a>
+          <a href="simulations/radar-equation/">📡 雷达方程</a>
+          <a href="simulations/phased-array-radar/">📡 相控阵雷达</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <nav class="filter-bar" aria-label="分类过滤">
     <div class="filter-inner">
-      <button class="filter-pill active" data-category="all" aria-pressed="true">
-        <span class="pill-icon">📂</span> 全部
-      </button>
-      <button class="filter-pill" data-category="antenna" aria-pressed="false">
-        <span class="pill-icon">📡</span> 天线与辐射
-      </button>
-      <button class="filter-pill" data-category="field-kinematics" aria-pressed="false">
-        <span class="pill-icon">🧲</span> 场动力学
-      </button>
-      <button class="filter-pill" data-category="mechanics" aria-pressed="false">
-        <span class="pill-icon">🏀</span> 力学
-      </button>
-      <button class="filter-pill" data-category="circuit" aria-pressed="false">
-        <span class="pill-icon">🔌</span> 电路
-      </button>
+      <button class="filter-pill active" data-category="all" aria-pressed="true"><span class="pill-icon">📂</span> 全部</button>
+      <button class="filter-pill" data-category="antenna" aria-pressed="false"><span class="pill-icon">📡</span> 天线与辐射</button>
+      <button class="filter-pill" data-category="field-kinematics" aria-pressed="false"><span class="pill-icon">🧲</span> 场动力学</button>
+      <button class="filter-pill" data-category="mechanics" aria-pressed="false"><span class="pill-icon">🏀</span> 力学</button>
+      <button class="filter-pill" data-category="circuit" aria-pressed="false"><span class="pill-icon">🔌</span> 电路</button>
     </div>
   </nav>
 
-  <!-- ============================================================ -->
-  <!-- Main Content -->
-  <!-- ============================================================ -->
   <main class="gallery-container">
-    <!-- Loading skeletons (shown while JSON loads) -->
     <div id="skeleton-grid" class="card-grid" aria-label="加载中">
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+      <div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
     </div>
-
-    <!-- Card grid (populated by JS) -->
     <div id="card-grid" class="card-grid hidden" aria-label="仿真列表"></div>
-
-    <!-- Empty state -->
     <div id="empty-state" class="empty-state hidden" aria-live="polite">
       <div class="empty-icon">🔍</div>
       <h3 class="empty-title">该分类暂无仿真</h3>
       <p class="empty-desc">试试选择其他分类，或查看全部仿真</p>
     </div>
-
-    <!-- Error state -->
     <div id="error-state" class="empty-state hidden" aria-live="assertive">
       <div class="empty-icon">⚠️</div>
       <h3 class="empty-title">加载失败</h3>
@@ -94,17 +105,21 @@
     </div>
   </main>
 
-  <!-- ============================================================ -->
-  <!-- Footer -->
-  <!-- ============================================================ -->
   <footer class="site-footer">
-    <p>
-      基于 HTML5 Canvas + Web 技术构建 ·
-      <a href="https://github.com" target="_blank" rel="noopener">GitHub</a> 开源 ·
-      中国大陆 & 全球可访问
-    </p>
+    <div class="footer-inner">
+      <div class="footer-brand">电子<b>仿真</b> · 小程序画廊</div>
+      <div class="footer-links">
+        <a href="index.html">首页</a>
+        <a href="simulations/index.html">仿真</a>
+        <a href="about.html">关于</a>
+        <a href="contribute.html">贡献</a>
+        <a href="https://github.com/alanyangsheng88b/simulation-gallery" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <div class="footer-note">基于 HTML5 Canvas + WebGL + three.js 构建 · 开源免费 · 中国大陆 &amp; 全球可访问</div>
+    </div>
   </footer>
 
-  <script src="gallery.js?v=2"></script>
+  <script src="assets/site.js?v=1"></script>
+  <script src="gallery.js?v=3"></script>
 </body>
 </html>
